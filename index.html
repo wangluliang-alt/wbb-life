@@ -52,5 +52,20 @@ function palette(key,label){return '<div class="color-row"><h3>'+label+'</h3><p 
 function exportData(){let b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='wbb-life-backup-'+today()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 async function importData(e){let f=e.target.files[0];if(!f)return;try{let obj=JSON.parse(await f.text());if(!Array.isArray(obj.items)||!obj.records||typeof obj.records!=='object')throw Error();if(!confirm('Replace all current data with this backup?'))return;db=obj;save();show('home')}catch{alert('Invalid backup file')}e.target.value=''}
 function render(){navigation();el.innerHTML=page==='home'?home():page==='all'?all():page==='detail'?detail():page==='new'?editor(false):page==='edit'?editor(true):settings();nav.style.display=['new','edit','detail'].includes(page)?'none':'flex'}
-applyColors();render();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+applyColors();render();
+if('serviceWorker' in navigator){
+  let initialController=Boolean(navigator.serviceWorker.controller);
+  let refreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(initialController&&!refreshing){refreshing=true;window.location.reload()}
+    initialController=true;
+  });
+  navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{
+    const check=()=>{if(navigator.onLine)reg.update().catch(()=>{})};
+    check();
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)check()});
+    window.addEventListener('pageshow',check);
+    setInterval(()=>{if(!document.hidden)check()},10*60*1000);
+  }).catch(()=>{});
+}
 </script></body></html>
