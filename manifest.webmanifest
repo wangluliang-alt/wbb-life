@@ -1,0 +1,18 @@
+{
+  "name": "WBB Life — 王比比生活",
+  "short_name": "WBB Life",
+  "description": "Your personal everyday life tracker",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf6ee",
+  "theme_color": "#faf6ee",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
