@@ -26,7 +26,7 @@
 .note-empty-tip{color:#a0a2aa;font-size:12px;padding:3px 10px}
 .event-history{display:flex;justify-content:space-between;gap:12px;padding:15px 0;border-bottom:1px solid #ececf0}.event-history p{margin:6px 0;white-space:pre-wrap;color:#333}.event-history button{background:#f4f0f2;border-radius:9px;padding:8px;margin-left:5px;color:#69485b}.field textarea{font:inherit}</style></head><body><div id="app" class="shell"></div><nav id="nav" class="bottom"></nav><script>
 const KEY='wbb-life-v1';
-const TYPES={bool:['✅','Yes / No','A simple daily check-in'],number:['⚖️','Number','Measurements like weight'],counter:['🔢','Counter','Tap +1 whenever it happens'],duration:['⏱️','Duration','Minutes or hours per day'],interval:['🌙','Time range','Start and end; multiple per day'],journal:['📝','Journal','Daily written notes']};
+const TYPES={event:['','Date + optional note','Record an event when it happens'],bool:['✅','Yes / No','A simple daily check-in'],number:['⚖️','Number','Measurements like weight'],counter:['🔢','Counter','Tap +1 whenever it happens'],duration:['⏱️','Duration','Minutes or hours per day'],interval:['🌙','Time range','Start and end; multiple per day'],journal:['📝','Journal','Daily written notes']};
 const starter=[['Weight','number','⚖️','kg'],['Reading','bool','📚',''],['Exercise','duration','🏃','min'],['Water','counter','💧','times'],['Sleep','interval','🌙','']];
 const iso=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
 const today=()=>iso(new Date());
@@ -69,7 +69,7 @@ const rec=(id,d)=>db.records[id]?.[d];
 const setrec=(id,d,v)=>{if(!db.records[id])db.records[id]={};if(v===null||v===''||Array.isArray(v)&&!v.length)delete db.records[id][d];else db.records[id][d]=v;save();render()};
 const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const head=(title,sub)=>'<div class="eyebrow">WBB LIFE · 王比比生活</div><h1>'+title+'</h1><p class="sub">'+sub+'</p>';
-function summary(it,d=today()){if(it.type==='event')return (db.events?.[it.id]||[]).some(x=>x.date===d)?'Event recorded':'Event Log';let v=rec(it.id,d);if(v==null||v===''||Array.isArray(v)&&!v.length)return 'Not recorded';if(it.type==='bool')return v?'✓ Done':'Not yet';if(it.type==='interval'){let m=v.reduce((s,x)=>s+minutes(x.start,x.end),0);return fmt(m)}if(it.type==='duration')return fmt(+v);if(it.type==='journal')return String(v).slice(0,28)+(String(v).length>28?'…':'');return v+(it.unit?' '+it.unit:'')}
+function summary(it,d=today()){if(it.type==='event')return (db.events?.[it.id]||[]).some(x=>x.date===d)?'Event recorded':'View history';let v=rec(it.id,d);if(v==null||v===''||Array.isArray(v)&&!v.length)return 'Not recorded';if(it.type==='bool')return v?'✓ Done':'Not yet';if(it.type==='interval'){let m=v.reduce((s,x)=>s+minutes(x.start,x.end),0);return fmt(m)}if(it.type==='duration')return fmt(+v);if(it.type==='journal')return String(v).slice(0,28)+(String(v).length>28?'…':'');return v+(it.unit?' '+it.unit:'')}
 const fmt=m=>{m=Math.round(m);return m>=60?Math.floor(m/60)+'h '+(m%60?m%60+'m':''):m+'m'};
 function minutes(a,b){if(!a||!b)return 0;let p=a.split(':').map(Number),q=b.split(':').map(Number),n=q[0]*60+q[1]-p[0]*60-p[1];return n<0?n+1440:n}
 function show(pageName,id){page=pageName;if(id)current=id;if(pageName!=='detail'){date=today();month=new Date().getMonth();year=new Date().getFullYear()}render();window.scrollTo(0,0)}
