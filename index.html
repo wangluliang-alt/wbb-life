@@ -500,6 +500,34 @@ async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cl
  // Preserve edits from other devices: rows unchanged locally since the last sync
  // must never overwrite newer cloud rows, including legacy rows without timestamps.
  let incoming=JSON.parse(JSON.stringify(db));
+ // For trackers, only local changes since the last successful sync may override
+ // remote values. Otherwise an older iPad snapshot would overwrite iPhone edits.
+ if(remote){
+   let trackerBase=null;
+   try{trackerBase=JSON.parse(localStorage.getItem('wbb-life-sync-base-'+cloudUser.id)||'null')}catch{}
+   if(trackerBase){
+     for(const field of ['items','categories','records']){
+       const localValue=db[field]|| (field==='records'?{}:[]);
+       const priorValue=trackerBase[field]|| (field==='records'?{}:[]);
+       if(JSON.stringify(localValue)===JSON.stringify(priorValue)){
+         incoming[field]=JSON.parse(JSON.stringify(remote[field]||(field==='records'?{}:[])));
+       }else if(field==='records'){
+         const mergedRecords=JSON.parse(JSON.stringify(remote.records||{}));
+         for(const [id,days] of Object.entries(db.records||{})){
+           const baseDays=trackerBase.records?.[id]||{};
+           const currentDays=days||{};
+           for(const day of new Set([...Object.keys(baseDays),...Object.keys(currentDays)])){
+             if(JSON.stringify(currentDays[day])===JSON.stringify(baseDays[day]))continue;
+             if(!mergedRecords[id])mergedRecords[id]={};
+             if(Object.prototype.hasOwnProperty.call(currentDays,day))mergedRecords[id][day]=currentDays[day];
+             else delete mergedRecords[id][day];
+           }
+         }
+         incoming.records=mergedRecords;
+       }
+     }
+   }
+ }
  if(remote){
    let baseline=null;try{baseline=JSON.parse(localStorage.getItem('wbb-life-sync-base-'+cloudUser.id))||null}catch{}
    let allDates=new Set([...Object.keys(incoming.notes||{}),...Object.keys(remote.notes||{})]);
@@ -546,6 +574,10 @@ async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cl
    }
  }
  let merged=remote?mergeLife(incoming,remote):incoming;
+ // Tracker records have already been reconciled against the sync baseline.
+ // Do not merge the stale local record map a second time.
+ if(remote&&existingBase)merged.records=incoming.records;
+
  if(incoming.thingsSections&&remote?.thingsSections&&Number(incoming.thingsUpdatedAt||0)>=Number(remote.thingsUpdatedAt||0)){merged.thingsSections=incoming.thingsSections.filter(x=>!new Set(merged.deletedThingsSections||[]).has(x.id)).map(c=>({...c,docs:(c.docs||[]).filter(d=>!new Set(merged.deletedThingsDocs||[]).has(d.id))}));merged.thingsUpdatedAt=incoming.thingsUpdatedAt||0}let w=await c.from('life_snapshots').upsert({user_id:cloudUser.id,payload:merged,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(w.error)throw w.error;db=cloudDirty===version?merged:mergeLife(db,merged);localStorage.setItem(KEY,JSON.stringify(db));localStorage.setItem('wbb-life-sync-base-'+cloudUser.id,JSON.stringify(merged));if(cloudDirty!==version)setTimeout(cloudSync,1500);cloudStatus='Synced '+new Date().toLocaleTimeString();if(page!=='new'&&page!=='edit'&&page!=='things-doc')render()}catch(e){cloudStatus='Sync error: '+e.message;if(page==='settings')render()}finally{cloudBusy=false}}
 function cloudPanel(){return '<div class="card"><h2>Cloud sync ☁️</h2><p>Same account, same records on iPhone, iPad and Mac.</p><p class="muted">'+escapeHtml(cloudStatus)+'</p>'+(cloudUser?'<p>'+escapeHtml(cloudUser.email||'Signed in')+'</p><button class="primary" onclick="cloudSync()">Sync now</button> <button class="secondary" onclick="cloudLogout()">Sign out</button>':'<label class="field">Email<input id="cloud-email" type="email"></label><label class="field">Password<input id="cloud-password" type="password"></label><button class="primary" onclick="cloudLogin()">Sign in</button><p class="muted">Private account only; no public signup.</p>')+'</div>'}
 
