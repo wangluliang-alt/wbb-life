@@ -159,7 +159,7 @@ function thingsBinPurge(id){
 }
 function thingsFindSection(){return (db.thingsSections||[]).find(x=>x.id===thingsSection)}
 function thingsAddSection(){thingsInit();let name=prompt('New section');if(!name?.trim())return;db.thingsSections.push({id:uid(),name:name.trim(),docs:[],updatedAt:Date.now()});thingsTouch();thingsSave()}
-function thingsOpenSection(id){thingsSection=id;thingsMovingDoc=null;page='things-section';render();window.scrollTo(0,0)}
+function thingsOpenSection(id){thingsSection=id;thingsMovingDoc=null;page='things-section';render();window.scrollTo(0,0);if(thingsFindSection()?.name.toLowerCase()==='shopping')thingsRestoreShopping()}
 function thingsMoveSection(id,step){let a=db.thingsSections,i=a.findIndex(x=>x.id===id),j=i+step;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];thingsTouch();save();render()}
 function thingsRenameSection(id){let c=db.thingsSections.find(x=>x.id===id);if(!c)return;let name=prompt('Rename section (leave blank to move to Bin)',c.name);if(name===null)return;if(!name.trim()){thingsDeleteSection(id);return}c.name=name.trim();c.updatedAt=Date.now();thingsTouch();thingsSave()}
 function thingsPreview(d){
@@ -167,26 +167,32 @@ function thingsPreview(d){
  const node=new DOMParser().parseFromString(html,'text/html');
  return (node.body.textContent||'').replace(/\s+/g,' ').trim().slice(0,250);
 }
+const WBB_SHOPPING_LIST_HTML="<h2>Flowers & Plants</h2><div><input type=\"checkbox\"> 2 big orchid</div><div><input type=\"checkbox\"> small orchid</div><div><input type=\"checkbox\" checked> 2 periwink</div><h2>Supermarket & Take aways:</h2><div><input type=\"checkbox\"> watermelon, peach, grape fruit, green grape</div><div><input type=\"checkbox\"> Doufu 2 types</div><div><input type=\"checkbox\"> Teochew balls</div><div><input type=\"checkbox\" checked> Face wash rub</div><div><input type=\"checkbox\" checked> Miren and mirnation sauce</div><div><input type=\"checkbox\"> Dry apricot</div><div><input type=\"checkbox\"> Sweets</div><div><input type=\"checkbox\" checked> Egg</div><div><input type=\"checkbox\"> yogurt</div><div><input type=\"checkbox\" checked> Starch</div><div><input type=\"checkbox\" checked> Termsrine paste, mint sauce, soup base</div><div><input type=\"checkbox\" checked> Decaf</div><div><input type=\"checkbox\"> Milk</div><div><input type=\"checkbox\"> Bread savoury</div><div><input type=\"checkbox\"> bee hoon</div><div><input type=\"checkbox\" checked> gula melaca liquid</div><div><input type=\"checkbox\" checked> Dry apricot</div><div><input type=\"checkbox\" checked> scoope lemon grass and korean tea</div><div><input type=\"checkbox\"> Cinnamon stick</div><div><input type=\"checkbox\" checked> Bay leaves</div>";
+function thingsShoppingIsBlank(d){const h=(d.html||'').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').replace(/\u00a0/g,' ').trim();return !h&&!String(d.body||'').trim()&&!(d.checks||[]).some(x=>String(x.text||'').trim())}
+let thingsShoppingRepairBusy=false;
 async function thingsRestoreShopping(){
- if(!confirm('Restore your Shopping List? Existing notes will be kept.'))return;
- if(cloudBusy){alert('Sync is running. Please wait and retry.');return}
- if(cloudUser&&navigator.onLine){await cloudSync();if(cloudStatus.startsWith('Sync error')){alert('Cloud sync failed. Nothing was changed. Please retry after checking Settings.');return}}
- thingsInit();
- let c=db.thingsSections.find(x=>x.id===thingsSection&&x.name.toLowerCase()==='shopping')||db.thingsSections.find(x=>x.name.toLowerCase()==='shopping');
- if(!c){c={id:uid(),name:'Shopping',docs:[],updatedAt:Date.now()};db.thingsSections.push(c)}
- c.docs=c.docs||[];
- const current=c.docs.find(d=>d.title==='Shopping List'&&d.html?.includes('Flowers & Plants')&&d.html?.includes('Bay leaves'));
- if(current){thingsOpenSection(c.id);alert('Your Shopping List is already saved. Tap the Shopping List card to open it.');return}
- const d={id:uid(),title:'Shopping List',body:'',checks:[],html:"<h2>Flowers & Plants</h2><div><input type=\"checkbox\"> 2 big orchid</div><div><input type=\"checkbox\"> small orchid</div><div><input type=\"checkbox\" checked> 2 periwink</div><h2>Supermarket & Take aways:</h2><div><input type=\"checkbox\"> watermelon, peach, grape fruit, green grape</div><div><input type=\"checkbox\"> Doufu 2 types</div><div><input type=\"checkbox\"> Teochew balls</div><div><input type=\"checkbox\" checked> Face wash rub</div><div><input type=\"checkbox\" checked> Miren and mirnation sauce</div><div><input type=\"checkbox\"> Dry apricot</div><div><input type=\"checkbox\"> Sweets</div><div><input type=\"checkbox\" checked> Egg</div><div><input type=\"checkbox\"> yogurt</div><div><input type=\"checkbox\" checked> Starch</div><div><input type=\"checkbox\" checked> Termsrine paste, mint sauce, soup base</div><div><input type=\"checkbox\" checked> Decaf</div><div><input type=\"checkbox\"> Milk</div><div><input type=\"checkbox\"> Bread savoury</div><div><input type=\"checkbox\"> bee hoon</div><div><input type=\"checkbox\" checked> gula melaca liquid</div><div><input type=\"checkbox\" checked> Dry apricot</div><div><input type=\"checkbox\" checked> scoope lemon grass and korean tea</div><div><input type=\"checkbox\"> Cinnamon stick</div><div><input type=\"checkbox\" checked> Bay leaves</div>",updatedAt:Date.now()};
- c.docs.push(d);c.updatedAt=Date.now();thingsTouch();save();
- if(cloudUser&&navigator.onLine){await cloudSync();if(cloudStatus.startsWith('Sync error')){alert('Saved on this device, but cloud sync failed. Do not delete the note. Check Settings and retry Sync now.');thingsOpenSection(c.id);return}}
- const found=db.thingsSections.some(x=>x.docs?.some(y=>y.id===d.id));
- thingsOpenSection(c.id);
- alert(found?'Shopping List saved. Tap the Shopping List card to see the checkboxes.':'Shopping List did not survive synchronization. No existing notes were removed. Please tell me.');
+ if(thingsShoppingRepairBusy||cloudBusy)return;
+ thingsShoppingRepairBusy=true;
+ try{
+  if(cloudUser&&navigator.onLine){await cloudSync();if(cloudStatus.startsWith('Sync error'))return}
+  thingsInit();
+  const c=db.thingsSections.find(x=>x.id===thingsSection&&x.name.toLowerCase()==='shopping')||db.thingsSections.find(x=>x.name.toLowerCase()==='shopping');
+  if(!c)return;
+  c.docs=c.docs||[];
+  if(c.docs.some(d=>d.title==='Shopping List'&&d.html?.includes('Flowers & Plants')&&d.html?.includes('Bay leaves')))return;
+  let d=c.docs.find(d=>d.title==='Shopping List'&&thingsShoppingIsBlank(d));
+  if(!d){
+   if(c.docs.some(d=>d.title==='Shopping List'))return;
+   d={id:uid(),title:'Shopping List',body:'',checks:[],html:'',updatedAt:0};c.docs.push(d);
+  }
+  d.html=WBB_SHOPPING_LIST_HTML;d.updatedAt=Date.now();c.updatedAt=d.updatedAt;thingsTouch();save();
+  if(cloudUser&&navigator.onLine)await cloudSync();
+  if((page==='things-section'&&thingsSection===c.id)||(page==='things-doc'&&thingsDoc===d.id))render();
+ }finally{thingsShoppingRepairBusy=false}
 }
 function thingsSectionPage(){
  let c=thingsFindSection();if(!c)return thingsHome();
- return '<div class="section"><button class="back" onclick="show(\'things\')">← Things</button><div>'+(c.name.toLowerCase()==='shopping'?'<button class="pill" onclick="thingsRestoreShopping()">Restore Shopping List</button> ':'')+'<button class="pill" onclick="thingsAddDoc()">+ Note</button></div></div><h2 class="things-collection-heading">'+escapeHtml(c.name)+'</h2>'+(thingsMovingDoc?'<p class="muted">Select another card to place the selected note before it. Tap ↕ again to cancel.</p>':'')+'<div class="things-card-grid">'+(c.docs||[]).map(d=>'<div class="things-card-shell '+(thingsMovingDoc===d.id?'things-moving':'')+'" ontouchstart="thingsCardTouchStart(event)" ontouchend="thingsCardTouchEnd(event)" ondragover="thingsCardDragOver(event)" ondrop="thingsCardDrop(event,\''+d.id+'\')"><div class="things-card-delete"><button onclick="thingsDeleteDocById(\''+d.id+'\')">Delete</button></div><button class="things-note-card" onclick="thingsCardOpenOrMove(\''+d.id+'\')"><strong>'+escapeHtml(d.title||'Untitled')+'</strong><span>'+escapeHtml(thingsPreview(d))+'</span></button><div class="things-card-controls"><button onclick="thingsMoveDoc(\''+d.id+'\',-1)" aria-label="Move up">↑</button><button onclick="thingsMoveDoc(\''+d.id+'\',1)" aria-label="Move down">↓</button><button onclick="thingsPickMove(\''+d.id+'\')" aria-label="Select card to move" title="Move">↕</button><button onclick="thingsCardMenu(this)" aria-label="More options">···</button><div class="things-card-menu" hidden><button onclick="thingsDeleteDocById(\''+d.id+'\')">Delete</button></div></div></div>').join('')+'</div>';
+ return '<div class="section"><button class="back" onclick="show(\'things\')">← Things</button><div>'+'<button class="pill" onclick="thingsAddDoc()">+ Note</button></div></div><h2 class="things-collection-heading">'+escapeHtml(c.name)+'</h2>'+(thingsMovingDoc?'<p class="muted">Select another card to place the selected note before it. Tap ↕ again to cancel.</p>':'')+'<div class="things-card-grid">'+(c.docs||[]).map(d=>'<div class="things-card-shell '+(thingsMovingDoc===d.id?'things-moving':'')+'" ontouchstart="thingsCardTouchStart(event)" ontouchend="thingsCardTouchEnd(event)" ondragover="thingsCardDragOver(event)" ondrop="thingsCardDrop(event,\''+d.id+'\')"><div class="things-card-delete"><button onclick="thingsDeleteDocById(\''+d.id+'\')">Delete</button></div><button class="things-note-card" onclick="thingsCardOpenOrMove(\''+d.id+'\')"><strong>'+escapeHtml(d.title||'Untitled')+'</strong><span>'+escapeHtml(thingsPreview(d))+'</span></button><div class="things-card-controls"><button onclick="thingsMoveDoc(\''+d.id+'\',-1)" aria-label="Move up">↑</button><button onclick="thingsMoveDoc(\''+d.id+'\',1)" aria-label="Move down">↓</button><button onclick="thingsPickMove(\''+d.id+'\')" aria-label="Select card to move" title="Move">↕</button><button onclick="thingsCardMenu(this)" aria-label="More options">···</button><div class="things-card-menu" hidden><button onclick="thingsDeleteDocById(\''+d.id+'\')">Delete</button></div></div></div>').join('')+'</div>';
 }
 function thingsPickMove(id){thingsMovingDoc=thingsMovingDoc===id?null:id;render()}
 function thingsCardOpenOrMove(id){if(!thingsMovingDoc){thingsOpenDoc(id);return}if(thingsMovingDoc===id){thingsMovingDoc=null;render();return}thingsMoveDocTo(thingsMovingDoc,id);thingsMovingDoc=null;render()}
@@ -207,7 +213,7 @@ function thingsDeleteDocById(id){
 
 function thingsAddDoc(){let c=thingsFindSection();if(!c)return;let title=prompt('Note title');if(!title?.trim())return;let d={id:uid(),title:title.trim(),body:'',checks:[],updatedAt:Date.now()};c.docs.push(d);save();thingsOpenDoc(d.id)}
 function thingsFindDoc(){return thingsFindSection()?.docs?.find(x=>x.id===thingsDoc)}
-function thingsOpenDoc(id){thingsDoc=id;thingsHistoryId=null;thingsHistory=[];thingsHistoryPos=-1;page='things-doc';render();thingsHistoryInit();window.scrollTo(0,0)}
+function thingsOpenDoc(id){thingsDoc=id;thingsHistoryId=null;thingsHistory=[];thingsHistoryPos=-1;page='things-doc';render();thingsHistoryInit();window.scrollTo(0,0);if(thingsFindSection()?.name.toLowerCase()==='shopping'&&thingsFindDoc()?.title==='Shopping List'&&thingsShoppingIsBlank(thingsFindDoc()))thingsRestoreShopping()}
 function thingsDocPage(){
  const d=thingsFindDoc();if(!d)return thingsSectionPage();
  const legacy=(d.body?'<p>'+escapeHtml(d.body).replace(/\n/g,'<br>')+'</p>':'')+(d.checks||[]).map(x=>'<p>'+(x.done?'☑':'☐')+' '+escapeHtml(x.text)+'</p>').join('');
