@@ -272,6 +272,7 @@ function mergeLife(local,remote){
      byId.set(c.id,{...(Number(c.updatedAt||0)>Number(old.updatedAt||0)?c:old),docs:[...docs.values()]});
    }
    out.thingsSections=[...byId.values()];
+   const names=new Set();out.thingsSections=out.thingsSections.filter(c=>{const key=c.name.trim().toLowerCase();if(names.has(key)&&!(c.docs||[]).length){out.deletedThingsSections.push(c.id);return false}names.add(key);return true});
  }
  const goneItems=new Set(out.deletedItems),goneCats=new Set(out.deletedCategories);
  out.categories=[...new Map([...(remote?.categories||[]),...(local.categories||[])].filter(x=>!goneCats.has(x.id)).map(x=>[x.id,x])).values()];
@@ -343,7 +344,7 @@ async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cl
    }
  }
  let merged=remote?mergeLife(incoming,remote):incoming;
- if(incoming.thingsSections&&remote?.thingsSections&&Number(incoming.thingsUpdatedAt||0)>=Number(remote.thingsUpdatedAt||0)){merged.thingsSections=incoming.thingsSections;merged.thingsUpdatedAt=incoming.thingsUpdatedAt||0}let w=await c.from('life_snapshots').upsert({user_id:cloudUser.id,payload:merged,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(w.error)throw w.error;db=cloudDirty===version?merged:mergeLife(db,merged);localStorage.setItem(KEY,JSON.stringify(db));localStorage.setItem('wbb-life-sync-base-'+cloudUser.id,JSON.stringify(merged));if(cloudDirty!==version)setTimeout(cloudSync,1500);cloudStatus='Synced '+new Date().toLocaleTimeString();if(page!=='new'&&page!=='edit')render()}catch(e){cloudStatus='Sync error: '+e.message;if(page==='settings')render()}finally{cloudBusy=false}}
+ if(incoming.thingsSections&&remote?.thingsSections&&Number(incoming.thingsUpdatedAt||0)>=Number(remote.thingsUpdatedAt||0)){merged.thingsSections=incoming.thingsSections.filter(x=>!new Set(merged.deletedThingsSections||[]).has(x.id));merged.thingsUpdatedAt=incoming.thingsUpdatedAt||0}let w=await c.from('life_snapshots').upsert({user_id:cloudUser.id,payload:merged,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(w.error)throw w.error;db=cloudDirty===version?merged:mergeLife(db,merged);localStorage.setItem(KEY,JSON.stringify(db));localStorage.setItem('wbb-life-sync-base-'+cloudUser.id,JSON.stringify(merged));if(cloudDirty!==version)setTimeout(cloudSync,1500);cloudStatus='Synced '+new Date().toLocaleTimeString();if(page!=='new'&&page!=='edit')render()}catch(e){cloudStatus='Sync error: '+e.message;if(page==='settings')render()}finally{cloudBusy=false}}
 function cloudPanel(){return '<div class="card"><h2>Cloud sync ☁️</h2><p>Same account, same records on iPhone, iPad and Mac.</p><p class="muted">'+escapeHtml(cloudStatus)+'</p>'+(cloudUser?'<p>'+escapeHtml(cloudUser.email||'Signed in')+'</p><button class="primary" onclick="cloudSync()">Sync now</button> <button class="secondary" onclick="cloudLogout()">Sign out</button>':'<label class="field">Email<input id="cloud-email" type="email"></label><label class="field">Password<input id="cloud-password" type="password"></label><button class="primary" onclick="cloudLogin()">Sign in</button><p class="muted">Private account only; no public signup.</p>')+'</div>'}
 
 applyColors();applyAppearance();render();cloudInit();
