@@ -142,12 +142,12 @@ function thingsSectionPage(){
 }
 function thingsAddDoc(){let c=thingsFindSection();if(!c)return;let title=prompt('Note title');if(!title?.trim())return;let d={id:uid(),title:title.trim(),body:'',checks:[],updatedAt:Date.now()};c.docs.push(d);save();thingsOpenDoc(d.id)}
 function thingsFindDoc(){return thingsFindSection()?.docs?.find(x=>x.id===thingsDoc)}
-function thingsOpenDoc(id){thingsDoc=id;page='things-doc';render();window.scrollTo(0,0)}
+function thingsOpenDoc(id){thingsDoc=id;thingsHistoryId=null;thingsHistory=[];thingsHistoryPos=-1;page='things-doc';render();thingsHistoryInit();window.scrollTo(0,0)}
 function thingsDocPage(){
  const d=thingsFindDoc();if(!d)return thingsSectionPage();
  const legacy=(d.body?'<p>'+escapeHtml(d.body).replace(/\n/g,'<br>')+'</p>':'')+(d.checks||[]).map(x=>'<p>'+(x.done?'☑':'☐')+' '+escapeHtml(x.text)+'</p>').join('');
  const content=d.html!=null?thingsSafeHtml(d.html):legacy;
- return '<div class="things-paper"><div class="things-paper-top"><button class="back" onclick="thingsOpenSection(\''+thingsSection+'\')">← '+escapeHtml(thingsFindSection().name)+'</button><button class="things-more" onclick="thingsToggleMenu()">···</button></div><div id="things-doc-menu" class="things-doc-menu" hidden><button onclick="thingsDeleteDoc()">Delete note</button></div><textarea class="things-paper-title" rows="1" aria-label="Note title" oninput="thingsEditTitle(this.value);thingsFitTitle(this)" placeholder="Untitled">'+escapeHtml(d.title)+'</textarea><div class="things-format" aria-label="Text formatting"><button type="button" onclick="thingsFormat(\'bold\')"><b>B</b></button><button type="button" onclick="thingsFormat(\'italic\')"><i>I</i></button><button type="button" onclick="thingsFormat(\'formatBlock\',\'h2\')">H</button><button type="button" onclick="thingsFormat(\'insertUnorderedList\')">• List</button><button type="button" onclick="thingsFormat(\'insertOrderedList\')">1. List</button><button type="button" onclick="thingsInsertChecklist()">☐</button><button type="button" onclick="thingsInsertLink()">Link</button></div><div id="things-rich-editor" class="things-rich-editor" contenteditable="true" role="textbox" aria-label="Note content" aria-multiline="true" data-placeholder="Start writing…" oninput="thingsEditHtml(this.innerHTML)" onpaste="thingsPaste(event)">'+content+'</div></div>';
+ return '<div class="things-paper"><div class="things-paper-top"><button class="back" onclick="thingsOpenSection(\''+thingsSection+'\')">← '+escapeHtml(thingsFindSection().name)+'</button><button class="things-more" onclick="thingsToggleMenu()">···</button></div><div id="things-doc-menu" class="things-doc-menu" hidden><button onclick="thingsDeleteDoc()">Delete note</button></div><textarea class="things-paper-title" rows="1" aria-label="Note title" oninput="thingsEditTitle(this.value);thingsFitTitle(this)" placeholder="Untitled">'+escapeHtml(d.title)+'</textarea><div class="things-format" aria-label="Text formatting"><button type="button" onclick="thingsUndo()" aria-label="Undo">↶ Undo</button><button type="button" onclick="thingsRedo()" aria-label="Redo">↷ Redo</button><button type="button" onclick="thingsFormat(\'bold\')"><b>B</b></button><button type="button" onclick="thingsFormat(\'italic\')"><i>I</i></button><button type="button" onclick="thingsFormat(\'formatBlock\',\'h2\')">H</button><button type="button" onclick="thingsFormat(\'insertUnorderedList\')">• List</button><button type="button" onclick="thingsFormat(\'insertOrderedList\')">1. List</button><button type="button" onclick="thingsInsertChecklist()">☐</button><button type="button" onclick="thingsInsertLink()">Link</button></div><div id="things-rich-editor" class="things-rich-editor" contenteditable="true" role="textbox" aria-label="Note content" aria-multiline="true" data-placeholder="Start writing…" oninput="thingsEditHtml(this.innerHTML)" onpaste="thingsPaste(event)">'+content+'</div></div>';
 }
 function thingsFitTitle(el){el.style.height='auto';el.style.height=el.scrollHeight+'px'}
 function thingsToggleMenu(){const e=document.getElementById('things-doc-menu');if(e)e.hidden=!e.hidden}
@@ -160,13 +160,39 @@ function thingsSafeHtml(html){
  function sanitize(node){for(const child of [...node.childNodes]){if(child.nodeType===8){child.remove();continue}if(child.nodeType!==1)continue;const tag=child.tagName;if(!allowed.has(tag)){child.replaceWith(doc.createTextNode(child.textContent||''));continue}const href=tag==='A'?nodeLink(child):null;for(const attr of [...child.attributes])child.removeAttribute(attr.name);if(tag==='A'&&href){child.setAttribute('href',href);child.setAttribute('target','_blank');child.setAttribute('rel','noopener noreferrer')}if(tag==='INPUT'){child.replaceWith(doc.createTextNode('☐ '));continue}sanitize(child)}}
  sanitize(root);return root.innerHTML;
 }
-function thingsEditHtml(html){const d=thingsFindDoc();if(!d)return;d.html=thingsSafeHtml(html);d.updatedAt=Date.now();save()}
+let thingsHistory=[],thingsHistoryPos=-1,thingsHistoryId=null,thingsHistoryApplying=false;
+function thingsHistoryInit(){
+ const d=thingsFindDoc();if(!d)return;
+ thingsHistoryId=d.id;thingsHistory=[{title:d.title,html:d.html!=null?thingsSafeHtml(d.html):document.getElementById('things-rich-editor')?.innerHTML||''}];thingsHistoryPos=0;
+}
+function thingsHistoryRecord(){
+ if(thingsHistoryApplying)return;
+ const d=thingsFindDoc();if(!d)return;
+ if(thingsHistoryId!==d.id)thingsHistoryInit();
+ const state={title:d.title,html:d.html!=null?d.html:''};
+ if(JSON.stringify(thingsHistory[thingsHistoryPos])===JSON.stringify(state))return;
+ thingsHistory=thingsHistory.slice(0,thingsHistoryPos+1);thingsHistory.push(state);
+ if(thingsHistory.length>100)thingsHistory.shift();
+ thingsHistoryPos=thingsHistory.length-1;
+}
+function thingsHistoryApply(state){
+ const d=thingsFindDoc();if(!d||!state)return;
+ thingsHistoryApplying=true;
+ d.title=state.title;d.html=thingsSafeHtml(state.html);d.updatedAt=Date.now();
+ const title=document.querySelector('.things-paper-title'),editor=document.getElementById('things-rich-editor');
+ if(title){title.value=d.title;thingsFitTitle(title)}
+ if(editor)editor.innerHTML=d.html;
+ save();thingsHistoryApplying=false;
+}
+function thingsUndo(){if(thingsHistoryPos<1)return;thingsHistoryApply(thingsHistory[--thingsHistoryPos])}
+function thingsRedo(){if(thingsHistoryPos>=thingsHistory.length-1)return;thingsHistoryApply(thingsHistory[++thingsHistoryPos])}
+function thingsEditHtml(html){const d=thingsFindDoc();if(!d)return;d.html=thingsSafeHtml(html);d.updatedAt=Date.now();save();thingsHistoryRecord()}
 function thingsFormat(command,value){const e=document.getElementById('things-rich-editor');if(!e)return;e.focus();document.execCommand(command,false,value||null);thingsEditHtml(e.innerHTML)}
 function thingsInsertChecklist(){thingsFormat('insertHTML','<div>☐ &nbsp;</div>')}
 function thingsInsertLink(){const url=prompt('Paste a link (https://...)');if(!url)return;let u;try{u=new URL(url);if(!['https:','http:'].includes(u.protocol))throw Error()}catch{return alert('Please enter a valid http or https link')};const e=document.getElementById('things-rich-editor');e.focus();const selection=window.getSelection(),label=selection?.toString()||u.hostname;document.execCommand('insertHTML',false,'<a href="'+escapeHtml(u.href)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(label)+'</a>');thingsEditHtml(e.innerHTML)}
 function thingsPaste(event){event.preventDefault();const html=event.clipboardData.getData('text/html'),plain=event.clipboardData.getData('text/plain');document.execCommand('insertHTML',false,html?thingsSafeHtml(html):escapeHtml(plain).replace(/\n/g,'<br>'));thingsEditHtml(event.currentTarget.innerHTML)}
 
-function thingsEditTitle(v){let d=thingsFindDoc();if(d){d.title=v;d.updatedAt=Date.now();save()}}
+function thingsEditTitle(v){let d=thingsFindDoc();if(d){d.title=v;d.updatedAt=Date.now();save();thingsHistoryRecord()}}
 function thingsEditBody(v){let d=thingsFindDoc();if(d){d.body=v;d.updatedAt=Date.now();save()}}
 function thingsAddCheck(){let d=thingsFindDoc();d.checks.push({id:uid(),text:'',done:false});d.updatedAt=Date.now();thingsSave()}
 function thingsCheck(id,done){let d=thingsFindDoc(),x=d?.checks.find(x=>x.id===id);if(x){x.done=done;d.updatedAt=Date.now();save()}}
