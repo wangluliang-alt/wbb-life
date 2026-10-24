@@ -471,6 +471,32 @@ async function cloudLogin(){let email=document.getElementById('cloud-email').val
 async function cloudLogout(){if(!confirm('Sign out on this device? Local data remains.'))return;await cloudClient().auth.signOut();cloudUser=null;cloudStatus='Not signed in';render()}
 function cloudChanged(){if(!cloudUser)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudSync,1200)}
 async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cloudBusy=true;cloudStatus='Syncing…';try{let c=cloudClient(),res=await c.from('life_snapshots').select('payload').eq('user_id',cloudUser.id).maybeSingle();if(res.error)throw res.error;let version=cloudDirty,remote=res.data?.payload||null;
+ // First connection on a device must be a READ, not a write of stale local defaults.
+ // Preserve its previous local data for recovery instead of uploading it over the account.
+ const syncBaseKey='wbb-life-sync-base-'+cloudUser.id;
+ let existingBase=null;
+ try{existingBase=JSON.parse(localStorage.getItem(syncBaseKey)||'null')}catch{}
+ if(remote&&!existingBase){
+   const recoveryKey='wbb-life-pre-first-sync-'+cloudUser.id;
+   if(!localStorage.getItem(recoveryKey))localStorage.setItem(recoveryKey,JSON.stringify(db));
+   db=JSON.parse(JSON.stringify(remote));
+   localStorage.setItem(KEY,JSON.stringify(db));
+   localStorage.setItem(syncBaseKey,JSON.stringify(remote));
+   cloudStatus='Synced '+new Date().toLocaleTimeString();
+   if(page!=='new'&&page!=='edit'&&page!=='things-doc')render();
+   return;
+ }
+ // A device with no edits since its last sync should simply download the cloud
+ // snapshot. Merging an unchanged old local snapshot can resurrect stale values.
+ if(remote&&existingBase&&JSON.stringify(db)===JSON.stringify(existingBase)){
+   db=JSON.parse(JSON.stringify(remote));
+   localStorage.setItem(KEY,JSON.stringify(db));
+   localStorage.setItem(syncBaseKey,JSON.stringify(remote));
+   cloudStatus='Synced '+new Date().toLocaleTimeString();
+   if(page!=='new'&&page!=='edit'&&page!=='things-doc')render();
+   return;
+ }
+
  // Preserve edits from other devices: rows unchanged locally since the last sync
  // must never overwrite newer cloud rows, including legacy rows without timestamps.
  let incoming=JSON.parse(JSON.stringify(db));
