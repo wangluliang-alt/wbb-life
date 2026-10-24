@@ -252,7 +252,27 @@ async function cloudInit(){let c=cloudClient();if(!c){cloudStatus='Cloud library
 async function cloudLogin(){let email=document.getElementById('cloud-email').value.trim(),password=document.getElementById('cloud-password').value;if(!email||!password)return alert('Enter email and password');let c=cloudClient();if(!c)return alert('Cloud library unavailable');let {data,error}=await c.auth.signInWithPassword({email,password});if(error)return alert(error.message);cloudUser=data.user;await cloudSync();render()}
 async function cloudLogout(){if(!confirm('Sign out on this device? Local data remains.'))return;await cloudClient().auth.signOut();cloudUser=null;cloudStatus='Not signed in';render()}
 function cloudChanged(){if(!cloudUser)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudSync,1200)}
-async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cloudBusy=true;cloudStatus='Syncing…';try{let c=cloudClient(),res=await c.from('life_snapshots').select('payload').eq('user_id',cloudUser.id).maybeSingle();if(res.error)throw res.error;let version=cloudDirty,merged=res.data?mergeLife(db,res.data.payload):JSON.parse(JSON.stringify(db));let w=await c.from('life_snapshots').upsert({user_id:cloudUser.id,payload:merged,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(w.error)throw w.error;db=cloudDirty===version?merged:mergeLife(db,merged);localStorage.setItem(KEY,JSON.stringify(db));if(cloudDirty!==version)setTimeout(cloudSync,1500);cloudStatus='Synced '+new Date().toLocaleTimeString();if(page!=='new'&&page!=='edit')render()}catch(e){cloudStatus='Sync error: '+e.message;if(page==='settings')render()}finally{cloudBusy=false}}
+async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cloudBusy=true;cloudStatus='Syncing…';try{let c=cloudClient(),res=await c.from('life_snapshots').select('payload').eq('user_id',cloudUser.id).maybeSingle();if(res.error)throw res.error;let version=cloudDirty,remote=res.data?.payload||null;
+ // Preserve edits from other devices: rows unchanged locally since the last sync
+ // must never overwrite newer cloud rows, including legacy rows without timestamps.
+ let incoming=JSON.parse(JSON.stringify(db));
+ if(remote){
+   let baseline=null;try{baseline=JSON.parse(localStorage.getItem('wbb-life-sync-base-'+cloudUser.id))||null}catch{}
+   let allDates=new Set([...Object.keys(incoming.notes||{}),...Object.keys(remote.notes||{})]);
+   for(let day of allDates){
+     let remoteById=new Map((remote.notes?.[day]||[]).map(x=>[x.id,x]));
+     let baseById=new Map((baseline?.notes?.[day]||[]).map(x=>[x.id,x]));
+     if(!incoming.notes?.[day])continue;
+     incoming.notes[day]=incoming.notes[day].filter(row=>{
+       let cloudRow=remoteById.get(row.id),prior=baseById.get(row.id);
+       if(!cloudRow)return true;
+       if(prior&&JSON.stringify(row)===JSON.stringify(prior))return false;
+       if(!prior&&!row.updatedAt)return false;
+       return Number(row.updatedAt||0)>Number(cloudRow.updatedAt||0);
+     });
+   }
+ }
+ let merged=remote?mergeLife(incoming,remote):incoming;let w=await c.from('life_snapshots').upsert({user_id:cloudUser.id,payload:merged,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(w.error)throw w.error;db=cloudDirty===version?merged:mergeLife(db,merged);localStorage.setItem(KEY,JSON.stringify(db));localStorage.setItem('wbb-life-sync-base-'+cloudUser.id,JSON.stringify(merged));if(cloudDirty!==version)setTimeout(cloudSync,1500);cloudStatus='Synced '+new Date().toLocaleTimeString();if(page!=='new'&&page!=='edit')render()}catch(e){cloudStatus='Sync error: '+e.message;if(page==='settings')render()}finally{cloudBusy=false}}
 function cloudPanel(){return '<div class="card"><h2>Cloud sync ☁️</h2><p>Same account, same records on iPhone, iPad and Mac.</p><p class="muted">'+escapeHtml(cloudStatus)+'</p>'+(cloudUser?'<p>'+escapeHtml(cloudUser.email||'Signed in')+'</p><button class="primary" onclick="cloudSync()">Sync now</button> <button class="secondary" onclick="cloudLogout()">Sign out</button>':'<label class="field">Email<input id="cloud-email" type="email"></label><label class="field">Password<input id="cloud-password" type="password"></label><button class="primary" onclick="cloudLogin()">Sign in</button><p class="muted">Private account only; no public signup.</p>')+'</div>'}
 
 applyColors();applyAppearance();render();cloudInit();
