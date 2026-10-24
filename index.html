@@ -167,17 +167,22 @@ function thingsPreview(d){
  const node=new DOMParser().parseFromString(html,'text/html');
  return (node.body.textContent||'').replace(/\s+/g,' ').trim().slice(0,250);
 }
-function thingsRestoreShopping(){
- if(!confirm('Restore the 22-item Shopping List with interactive checkboxes? Existing notes will not be overwritten.'))return;
+async function thingsRestoreShopping(){
+ if(!confirm('Restore your Shopping List? Existing notes will be kept.'))return;
+ if(cloudBusy){alert('Sync is running. Please wait and retry.');return}
+ if(cloudUser&&navigator.onLine){await cloudSync();if(cloudStatus.startsWith('Sync error')){alert('Cloud sync failed. Nothing was changed. Please retry after checking Settings.');return}}
  thingsInit();
- let c=db.thingsSections.find(x=>x.name.toLowerCase()==='shopping');
+ let c=db.thingsSections.find(x=>x.id===thingsSection&&x.name.toLowerCase()==='shopping')||db.thingsSections.find(x=>x.name.toLowerCase()==='shopping');
  if(!c){c={id:uid(),name:'Shopping',docs:[],updatedAt:Date.now()};db.thingsSections.push(c)}
- const existing=(c.docs||[]).find(d=>d.title.toLowerCase()==='shopping list');
- if(existing&&((existing.html||'').trim()||(existing.body||'').trim()||(existing.checks||[]).length)){alert('Shopping List already has content. Nothing was overwritten.');thingsOpenSection(c.id);return}
- const d=existing||{id:uid(),title:'Shopping List',body:'',checks:[]};
- d.html="<h2>Flowers & Plants</h2><div><input type=\"checkbox\"> 2 big orchid</div><div><input type=\"checkbox\"> small orchid</div><div><input type=\"checkbox\" checked> 2 periwink</div><h2>Supermarket & Take aways:</h2><div><input type=\"checkbox\"> watermelon, peach, grape fruit, green grape</div><div><input type=\"checkbox\"> Doufu 2 types</div><div><input type=\"checkbox\"> Teochew balls</div><div><input type=\"checkbox\" checked> Face wash rub</div><div><input type=\"checkbox\" checked> Miren and mirnation sauce</div><div><input type=\"checkbox\"> Dry apricot</div><div><input type=\"checkbox\"> Sweets</div><div><input type=\"checkbox\" checked> Egg</div><div><input type=\"checkbox\"> yogurt</div><div><input type=\"checkbox\" checked> Starch</div><div><input type=\"checkbox\" checked> Termsrine paste, mint sauce, soup base</div><div><input type=\"checkbox\" checked> Decaf</div><div><input type=\"checkbox\"> Milk</div><div><input type=\"checkbox\"> Bread savoury</div><div><input type=\"checkbox\"> bee hoon</div><div><input type=\"checkbox\" checked> gula melaca liquid</div><div><input type=\"checkbox\" checked> Dry apricot</div><div><input type=\"checkbox\" checked> scoope lemon grass and korean tea</div><div><input type=\"checkbox\"> Cinnamon stick</div><div><input type=\"checkbox\" checked> Bay leaves</div>";d.updatedAt=Date.now();
- if(!existing)c.docs.push(d);
- c.updatedAt=Date.now();thingsTouch();save();thingsOpenSection(c.id);alert('Shopping List restored. Open it to tick and untick items.');
+ c.docs=c.docs||[];
+ const current=c.docs.find(d=>d.title==='Shopping List'&&d.html?.includes('Flowers & Plants')&&d.html?.includes('Bay leaves'));
+ if(current){thingsOpenSection(c.id);alert('Your Shopping List is already saved. Tap the Shopping List card to open it.');return}
+ const d={id:uid(),title:'Shopping List',body:'',checks:[],html:"<h2>Flowers & Plants</h2><div><input type=\"checkbox\"> 2 big orchid</div><div><input type=\"checkbox\"> small orchid</div><div><input type=\"checkbox\" checked> 2 periwink</div><h2>Supermarket & Take aways:</h2><div><input type=\"checkbox\"> watermelon, peach, grape fruit, green grape</div><div><input type=\"checkbox\"> Doufu 2 types</div><div><input type=\"checkbox\"> Teochew balls</div><div><input type=\"checkbox\" checked> Face wash rub</div><div><input type=\"checkbox\" checked> Miren and mirnation sauce</div><div><input type=\"checkbox\"> Dry apricot</div><div><input type=\"checkbox\"> Sweets</div><div><input type=\"checkbox\" checked> Egg</div><div><input type=\"checkbox\"> yogurt</div><div><input type=\"checkbox\" checked> Starch</div><div><input type=\"checkbox\" checked> Termsrine paste, mint sauce, soup base</div><div><input type=\"checkbox\" checked> Decaf</div><div><input type=\"checkbox\"> Milk</div><div><input type=\"checkbox\"> Bread savoury</div><div><input type=\"checkbox\"> bee hoon</div><div><input type=\"checkbox\" checked> gula melaca liquid</div><div><input type=\"checkbox\" checked> Dry apricot</div><div><input type=\"checkbox\" checked> scoope lemon grass and korean tea</div><div><input type=\"checkbox\"> Cinnamon stick</div><div><input type=\"checkbox\" checked> Bay leaves</div>",updatedAt:Date.now()};
+ c.docs.push(d);c.updatedAt=Date.now();thingsTouch();save();
+ if(cloudUser&&navigator.onLine){await cloudSync();if(cloudStatus.startsWith('Sync error')){alert('Saved on this device, but cloud sync failed. Do not delete the note. Check Settings and retry Sync now.');thingsOpenSection(c.id);return}}
+ const found=db.thingsSections.some(x=>x.docs?.some(y=>y.id===d.id));
+ thingsOpenSection(c.id);
+ alert(found?'Shopping List saved. Tap the Shopping List card to see the checkboxes.':'Shopping List did not survive synchronization. No existing notes were removed. Please tell me.');
 }
 function thingsSectionPage(){
  let c=thingsFindSection();if(!c)return thingsHome();
