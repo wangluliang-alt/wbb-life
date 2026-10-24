@@ -615,10 +615,31 @@ async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cl
 function cloudPanel(){return '<div class="card"><h2>Cloud sync ☁️</h2><p>Same account, same records on iPhone, iPad and Mac.</p><p class="muted">'+escapeHtml(cloudStatus)+'</p>'+(cloudUser?'<p>'+escapeHtml(cloudUser.email||'Signed in')+'</p><button class="primary" onclick="cloudSync()">Sync now</button> <button class="secondary" onclick="cloudLogout()">Sign out</button>':'<label class="field">Email<input id="cloud-email" type="email"></label><label class="field">Password<input id="cloud-password" type="password"></label><button class="primary" onclick="cloudLogin()">Sign in</button><p class="muted">Private account only; no public signup.</p>')+'</div>'}
 
 applyColors();applyAppearance();render();cloudInit();
+let wbbUpdateReady=false;
+function wbbShowUpdate(){
+ if(document.getElementById('wbb-update-banner'))return;
+ const bar=document.createElement('div');bar.id='wbb-update-banner';
+ bar.style.cssText='position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:50%;transform:translateX(-50%);z-index:9999;max-width:calc(100% - 24px);width:420px;background:#fff;color:#26372f;border:1px solid #d5dfd9;box-shadow:0 6px 25px #0002;border-radius:14px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;font:15px -apple-system,BlinkMacSystemFont,sans-serif';
+ bar.innerHTML='<span>New version available</span><button type="button" style="background:#d2f2df;border-radius:9px;padding:9px 13px;color:#25372b">Update</button>';
+ bar.querySelector('button').addEventListener('click',()=>{
+   // Never silently reload while the user is editing. Save the existing local
+   // snapshot and reload only after an explicit tap.
+   localStorage.setItem(KEY,JSON.stringify(db));
+   sessionStorage.setItem('wbb-life-update-page',page);
+   location.reload();
+ });
+ document.body.appendChild(bar);
+}
+const wbbRestoredPage=sessionStorage.getItem('wbb-life-update-page');
+if(wbbRestoredPage){sessionStorage.removeItem('wbb-life-update-page');if(wbbRestoredPage!=='new'&&wbbRestoredPage!=='edit'&&wbbRestoredPage!=='things-doc'){page=wbbRestoredPage;render()}}
 if('serviceWorker' in navigator){
   // Do not reload an active session when a new service worker takes control.
   // A fresh app launch still starts at Do; updates apply on the next launch.
   navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{
+    // A controller change means updated code is available, but never force reload.
+    // Only offer the button to an already open app, not on first installation.
+    let controllerAtStart=!!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{if(controllerAtStart){wbbUpdateReady=true;wbbShowUpdate()}controllerAtStart=true});
     const check=()=>{if(navigator.onLine)reg.update().catch(()=>{})};
     check();
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)check()});
