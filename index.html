@@ -53,7 +53,7 @@
 .tracker-v2-top{display:flex;justify-content:flex-end;height:14px}.tracker-v2-grip{font-size:19px;color:#677674;cursor:grab;touch-action:none;user-select:none;line-height:16px;padding:0 2px}.tracker-v2-moving{opacity:.65}.tracker-v2-drop-target{outline:3px dashed #e25d93;outline-offset:2px}
 .things-v2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0 34px}
 .things-v2-card{border-radius:21px;min-width:0;min-height:205px;padding:15px 17px;box-shadow:0 3px 12px #00000008}
-.things-v2-card-top{display:flex;justify-content:flex-end;height:17px}.things-v2-grip{cursor:grab;touch-action:none;user-select:none;color:#71827b;font-size:20px;line-height:18px}
+.things-v2-card-top{display:flex;justify-content:flex-end;align-items:center;gap:12px;height:23px}.things-v2-edit{border:0;background:transparent;color:#536c68;font-size:13px;cursor:pointer;padding:2px 4px}.things-v2-grip{cursor:grab;touch-action:none;user-select:none;color:#71827b;font-size:20px;line-height:18px}
 .things-v2-open{display:block;text-align:left;background:transparent;border:0;padding:0;width:100%;color:#263242;cursor:pointer}
 .things-v2-open strong{display:block;font-size:21px;margin-bottom:5px}.things-v2-open small{font-size:13px;color:#65716f}
 .things-v2-preview{display:flex;flex-direction:column;gap:8px;margin-top:16px}.things-v2-preview span{font-size:14px;line-height:1.35;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.things-v2-preview span:before{content:"• ";opacity:.55}.things-v2-preview .things-v2-muted{color:#77847f}
@@ -166,7 +166,7 @@ function thingsHome(){
  const colors=['#ffdce9','#d2f2df','#d7edff','#fff0c8','#e9dcff'];
  return '<div class="section"><h2>Things</h2><button class="pill" onclick="thingsAddSection()">+ Add</button></div><div class="things-v2-grid">'+db.thingsSections.map((c,i)=>{
  const previewCount=c.previewCount===0?0:([1,2,3].includes(Number(c.previewCount))?Number(c.previewCount):3);const previews=(c.docs||[]).slice().sort((x,y)=>(y.updatedAt||0)-(x.updatedAt||0)).slice(0,previewCount);
- return '<article class="things-v2-card '+(c.cardSize==='wide'?'things-v2-wide':'')+'" draggable="true" data-things-id="'+escapeHtml(c.id)+'" ondragstart="thingsV2DragStart(event)" ondragover="thingsV2DragOver(event)" ondrop="thingsV2Drop(event)" ondragend="thingsV2DragEnd(event)" style="background:'+escapeHtml(c.color||colors[i%colors.length])+'"><div class="things-v2-card-top"><span class="things-v2-grip" title="Drag to reorder" onpointerdown="thingsV2TouchStart(event)" onpointermove="thingsV2TouchMove(event)" onpointerup="thingsV2TouchEnd(event)" onpointercancel="thingsV2TouchCancel(event)">⠿</span></div><button class="things-v2-open" onclick="thingsOpenSection(\''+c.id+'\')"><strong>'+escapeHtml(c.name)+'</strong><small>'+(c.docs||[]).length+' notes</small><div class="things-v2-preview">'+(previewCount===0?'':previews.length?previews.map(d=>'<span>'+escapeHtml(d.title||thingsPreview(d).slice(0,65)||'Untitled')+'</span>').join(''):'<span class="things-v2-muted">Add your first note</span>')+'</div></button></article>';
+ return '<article class="things-v2-card '+(c.cardSize==='wide'?'things-v2-wide':'')+'" draggable="true" data-things-id="'+escapeHtml(c.id)+'" ondragstart="thingsV2DragStart(event)" ondragover="thingsV2DragOver(event)" ondrop="thingsV2Drop(event)" ondragend="thingsV2DragEnd(event)" style="background:'+escapeHtml(c.color||colors[i%colors.length])+'"><div class="things-v2-card-top"><button type="button" class="things-v2-edit" onclick="thingsCardSettingsFor(\''+c.id+'\')" aria-label="Edit card">Edit</button><span class="things-v2-grip" title="Drag to reorder" onpointerdown="thingsV2TouchStart(event)" onpointermove="thingsV2TouchMove(event)" onpointerup="thingsV2TouchEnd(event)" onpointercancel="thingsV2TouchCancel(event)">⠿</span></div><button class="things-v2-open" onclick="thingsOpenSection(\''+c.id+'\')"><strong>'+escapeHtml(c.name)+'</strong><small>'+(c.docs||[]).length+' notes</small><div class="things-v2-preview">'+(previewCount===0?'':previews.length?previews.map(d=>'<span>'+escapeHtml(d.title||thingsPreview(d).slice(0,65)||'Untitled')+'</span>').join(''):'<span class="things-v2-muted">Add your first note</span>')+'</div></button></article>';
  }).join('')+'<button class="things-v2-add" onclick="thingsAddSection()">+<span>Add Category</span></button></div>';
 }
 let thingsV2Dragged=null,thingsV2Pointer=null;
@@ -202,6 +202,7 @@ function thingsV2TouchCancel(){
  document.querySelectorAll('.things-v2-moving,.things-v2-drop').forEach(x=>x.classList.remove('things-v2-moving','things-v2-drop'));
  thingsV2Pointer=null;
 }
+function thingsCardSettingsFor(id){thingsSection=id;thingsSectionManage()}
 function thingsSectionManage(){
  const c=thingsFindSection();if(!c)return;
  document.getElementById('things-card-settings')?.remove();
