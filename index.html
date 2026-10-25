@@ -475,7 +475,7 @@ function safeCloudRender(){
  // Rebuilding the Do page while a textarea has focus destroys the input,
  // moves the caret, and makes iOS jump to the top during typing.
  const active=document.activeElement;
- if(page==='notes'&&active&&active.matches('textarea.note-text'))return;
+ if(page==='notes')return; // Never redraw the Do page during background sync; preserve scroll and cursor.
  if(page!=='new'&&page!=='edit'&&page!=='things-doc')render();
 }
 async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cloudBusy=true;cloudStatus='Syncing…';try{let c=cloudClient(),res=await c.from('life_snapshots').select('payload').eq('user_id',cloudUser.id).maybeSingle();if(res.error)throw res.error;let version=cloudDirty,remote=res.data?.payload||null;
@@ -609,8 +609,8 @@ function cloudPanel(){return '<div class="card"><h2>Cloud sync ☁️</h2><p>Sam
 function noteGrowAndKeepVisible(input){
  // iOS PWA: keep the active input above the software keyboard as it grows.
  // Do not replace the DOM node, blur it, or reset the selection/caret.
- input.style.height='auto';
- input.style.height=input.scrollHeight+'px';
+ // Grow only when needed; avoid the auto-height reset that moves the viewport.
+ if(input.scrollHeight>input.clientHeight+1)input.style.height=input.scrollHeight+'px';
  requestAnimationFrame(()=>{
    if(document.activeElement!==input)return;
    const viewport=window.visualViewport;
@@ -626,8 +626,18 @@ function noteGrowAndKeepVisible(input){
    else if(rect.top<top+12)window.scrollBy({top:rect.top-top-20,behavior:'instant'});
  });
 }
-function sizeNoteTextareas(){document.querySelectorAll('textarea.note-text').forEach(el=>{el.style.height='auto';el.style.height=el.scrollHeight+'px'})}
-const noteResizeObserver=new MutationObserver(()=>sizeNoteTextareas());
+function sizeNoteTextareas(){
+ document.querySelectorAll('textarea.note-text').forEach(el=>{
+   // Do not shrink and re-expand an active textarea: iOS scroll anchoring
+   // can jump the viewport after the last keystroke.
+   if(document.activeElement===el)return;
+   const desired=el.scrollHeight;
+   if(desired>el.offsetHeight)el.style.height=desired+'px';
+ });
+}
+const noteResizeObserver=new MutationObserver(mutations=>{
+ if(mutations.some(m=>m.addedNodes.length))requestAnimationFrame(sizeNoteTextareas);
+});
 noteResizeObserver.observe(document.getElementById('app'),{childList:true,subtree:true});
 applyColors();applyAppearance();render();sizeNoteTextareas();cloudInit();
 if('serviceWorker' in navigator){
