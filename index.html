@@ -69,7 +69,7 @@
 .tcs-label{font-size:15px;margin:14px 0 8px}.tcs-palette{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.tcs-swatch{height:37px;border:1px solid #0001;border-radius:10px;cursor:pointer}
 .tcs-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}.tcs-actions button{padding:10px 16px;border-radius:10px}
 .tcs-delete{border:0;background:none;color:#b34b60;padding:12px 0 0;font-size:14px;cursor:pointer}
-</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script></head><body><div id="app" class="shell"></div><nav id="nav" class="bottom"></nav><script>
+.tracker-v2-wide{grid-column:1/-1}.tracker-v2-edit{border:0;background:transparent;color:#536c68;font-size:13px;cursor:pointer;padding:2px 4px}.tracker-v2-top{display:flex;justify-content:flex-end;align-items:center;gap:12px}.tvs-order{margin-top:17px;border-top:1px solid #e6e9e8;padding-top:10px}.tvs-order p{font-size:14px;color:#65716f;margin:4px 0 9px}.tvs-order button{border:1px solid #d7dfdb;background:#f7faf8;padding:9px;border-radius:9px;color:#344c45}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script></head><body><div id="app" class="shell"></div><nav id="nav" class="bottom"></nav><script>
 const KEY='wbb-life-v1';
 const TYPES={event:['','Date + optional note','Record an event when it happens'],bool:['✅','Yes / No','A simple daily check-in'],number:['⚖️','Number','Measurements like weight'],counter:['🔢','Counter','Tap +1 whenever it happens'],duration:['⏱️','Duration','Minutes or hours per day'],interval:['🌙','Time range','Start and end; multiple per day'],journal:['📝','Journal','Daily written notes']};
 const starter=[['Weight','number','⚖️','kg'],['Reading','bool','📚',''],['Exercise','duration','🏃','min'],['Water','counter','💧','times'],['Sleep','interval','🌙','']];
@@ -208,13 +208,14 @@ function thingsSectionManage(){
  document.getElementById('things-card-settings')?.remove();
  const colors=['#ffdce9','#d2f2df','#d7edff','#fff0c8','#e9dcff','#ffe2d3','#d8f0f3','#f9dfed','#e5efcd','#f7e6ff'];
  const color=c.color||colors[Math.max(0,db.thingsSections.findIndex(x=>x.id===c.id))%5];
- document.body.insertAdjacentHTML('beforeend','<div id="things-card-settings" class="things-card-settings-overlay"><div class="things-card-settings-dialog"><h2>Card Settings</h2><label>Name<input id="tcs-name" maxlength="70"></label><div class="tcs-label">Card color</div><div class="tcs-palette">'+colors.map(v=>'<button type="button" class="tcs-swatch" style="background:'+v+'" data-color="'+v+'" onclick="thingsCardPickColor(this)" aria-label="Select color"></button>').join('')+'</div><label>Custom color<input type="color" id="tcs-color"></label><label>Card size<select id="tcs-size"><option value="normal">Normal · half row</option><option value="wide">Wide · full row</option></select></label><label>Preview<select id="tcs-preview"><option value="3">3 notes</option><option value="2">2 notes</option><option value="1">1 note</option><option value="0">Hide preview</option></select></label><div class="tcs-actions"><button type="button" onclick="thingsCardSettingsClose()">Cancel</button><button type="button" class="primary" onclick="thingsCardSettingsSave()">Save</button></div><button class="tcs-delete" type="button" onclick="thingsCardSettingsDelete()">Move category to Bin</button></div></div>');
+ document.body.insertAdjacentHTML('beforeend','<div id="things-card-settings" class="things-card-settings-overlay"><div class="things-card-settings-dialog"><h2>Card Settings</h2><label>Name<input id="tcs-name" maxlength="70"></label><div class="tcs-label">Card color</div><div class="tcs-palette">'+colors.map(v=>'<button type="button" class="tcs-swatch" style="background:'+v+'" data-color="'+v+'" onclick="thingsCardPickColor(this)" aria-label="Select color"></button>').join('')+'</div><label>Custom color<input type="color" id="tcs-color"></label><label>Card size<select id="tcs-size"><option value="normal">Normal · half row</option><option value="wide">Wide · full row</option></select></label><label>Preview<select id="tcs-preview"><option value="3">3 notes</option><option value="2">2 notes</option><option value="1">1 note</option><option value="0">Hide preview</option></select></label><div class="tcs-actions"><button type="button" onclick="thingsCardSettingsClose()">Cancel</button><button type="button" class="primary" onclick="thingsCardSettingsSave()">Save</button></div><div class="tvs-order"><p>Card order</p><button onclick="thingsCardSettingsMove(-1)">Move earlier ↑</button> <button onclick="thingsCardSettingsMove(1)">Move later ↓</button></div><button class="tcs-delete" type="button" onclick="thingsCardSettingsDelete()">Move category to Bin</button></div></div>');
  document.getElementById('tcs-name').value=c.name;
  document.getElementById('tcs-color').value=/^#[0-9a-f]{6}$/i.test(color)?color:'#ffdce9';
  document.getElementById('tcs-size').value=c.cardSize==='wide'?'wide':'normal';
  document.getElementById('tcs-preview').value=String([0,1,2,3].includes(Number(c.previewCount))?c.previewCount:3);
 }
 function thingsCardPickColor(btn){document.getElementById('tcs-color').value=btn.dataset.color}
+function thingsCardSettingsMove(step){const c=thingsFindSection();if(!c)return;thingsMoveSection(c.id,step);thingsSectionManage()}
 function thingsCardSettingsClose(){document.getElementById('things-card-settings')?.remove()}
 function thingsCardSettingsSave(){
  const c=thingsFindSection();if(!c)return;
@@ -418,7 +419,7 @@ function trackerV2Chart(card){
  return '<svg class="tracker-v2-chart" viewBox="0 0 '+w+' '+h+'" aria-label="Seven day trend">'+vals.map((v,i)=>v===null?'':'<rect x="'+(8+i*41)+'" y="'+scale(v)+'" width="24" height="'+Math.max(3,76-scale(v))+'" rx="5" fill="#65a7a1"/>').join('')+'</svg>';
 }
 function trackerV2Card(card){
- return '<article class="tracker-v2-card" draggable="true" data-tracker-id="'+escapeHtml(card.id)+'" ondragstart="trackerV2DragStart(event)" ondragover="trackerV2DragOver(event)" ondrop="trackerV2Drop(event)" ondragend="trackerV2DragEnd(event)" style="background:'+escapeHtml(card.color||'#f5f0f4')+'"><div class="tracker-v2-top"><span class="tracker-v2-grip" title="Drag to reorder" onpointerdown="trackerV2TouchStart(event)" onpointermove="trackerV2TouchMove(event)" onpointerup="trackerV2TouchEnd(event)" onpointercancel="trackerV2TouchCancel(event)">⠿</span></div><button class="tracker-v2-open" onclick="trackerV2Edit(\''+card.id+'\')"><span class="tracker-v2-title">'+escapeHtml(card.name)+'</span><span class="tracker-v2-value">'+escapeHtml(trackerV2Label(card,homeDate))+'</span><span class="tracker-v2-hint">Tap to record</span></button>'+trackerV2Chart(card)+'</article>';
+ return '<article class="tracker-v2-card '+(card.cardSize==='wide'?'tracker-v2-wide':'')+'" draggable="true" data-tracker-id="'+escapeHtml(card.id)+'" ondragstart="trackerV2DragStart(event)" ondragover="trackerV2DragOver(event)" ondrop="trackerV2Drop(event)" ondragend="trackerV2DragEnd(event)" style="background:'+escapeHtml(card.color||'#f5f0f4')+'"><div class="tracker-v2-top"><button type="button" class="tracker-v2-edit" onclick="trackerV2Settings(\''+card.id+'\')">Edit</button><span class="tracker-v2-grip" title="Drag to reorder" onpointerdown="trackerV2TouchStart(event)" onpointermove="trackerV2TouchMove(event)" onpointerup="trackerV2TouchEnd(event)" onpointercancel="trackerV2TouchCancel(event)">⠿</span></div><button class="tracker-v2-open" onclick="trackerV2Edit(\''+card.id+'\')"><span class="tracker-v2-title">'+escapeHtml(card.name)+'</span><span class="tracker-v2-value">'+escapeHtml(trackerV2Label(card,homeDate))+'</span><span class="tracker-v2-hint">Tap to record</span></button>'+(card.showChart===false?'':trackerV2Chart(card))+'</article>';
 }
 let trackerV2Dragged=null,trackerV2Pointer=null;
 function trackerV2Reorder(from,to){
@@ -467,6 +468,24 @@ function trackerV2SleepRow(entry={}){
  div.innerHTML='<div class="tv2-sleep-times"><label>Sleep start<input class="tv2-start" type="time"></label><label>Wake time<input class="tv2-end" type="time"></label></div><button type="button" class="tv2-remove" onclick="this.closest(\'.tv2-sleep-row\').remove()">Remove this entry</button>';
  div.querySelector('.tv2-start').value=entry.start||'23:00';div.querySelector('.tv2-end').value=entry.end||'07:00';
  box.appendChild(div);
+}
+function trackerV2Settings(id){
+ const c=db.trackerCards.find(x=>x.id===id);if(!c)return;
+ document.getElementById('tracker-v2-settings')?.remove();
+ const colors=['#ffdce9','#d2f2df','#d7edff','#fff0c8','#e9dcff','#ffe2d3','#d8f0f3','#f9dfed','#e5efcd','#f7e6ff'];
+ const el=document.createElement('div');el.id='tracker-v2-settings';el.dataset.id=id;el.className='things-card-settings-overlay';
+ el.innerHTML='<div class="things-card-settings-dialog"><h2>Tracker Settings</h2><label>Name<input id="tvs-name" maxlength="45"></label><div class="tcs-label">Card color</div><div class="tcs-palette">'+colors.map(v=>'<button type="button" class="tcs-swatch" data-color="'+v+'" style="background:'+v+'" onclick="document.getElementById(\'tvs-color\').value=this.dataset.color"></button>').join('')+'</div><label>Custom color<input id="tvs-color" type="color"></label><label>Card size<select id="tvs-size"><option value="normal">Normal · half row</option><option value="wide">Wide · full row</option></select></label><label>Trend chart<select id="tvs-chart"><option value="show">Show</option><option value="hide">Hide</option></select></label><div class="tcs-actions"><button onclick="trackerV2SettingsClose()">Cancel</button><button class="primary" onclick="trackerV2SettingsSave()">Save</button></div><div class="tvs-order"><p>Card order</p><button onclick="trackerV2SettingsMove(-1)">Move earlier ↑</button> <button onclick="trackerV2SettingsMove(1)">Move later ↓</button></div></div>';
+ document.body.appendChild(el);document.getElementById('tvs-name').value=c.name;document.getElementById('tvs-color').value=/^#[0-9a-f]{6}$/i.test(c.color||'')?c.color:'#ffdce9';document.getElementById('tvs-size').value=c.cardSize==='wide'?'wide':'normal';document.getElementById('tvs-chart').value=c.showChart===false?'hide':'show';
+}
+function trackerV2SettingsClose(){document.getElementById('tracker-v2-settings')?.remove()}
+function trackerV2SettingsSave(){
+ const id=document.getElementById('tracker-v2-settings')?.dataset.id,c=db.trackerCards.find(x=>x.id===id);if(!c)return;
+ const name=document.getElementById('tvs-name').value.trim();if(!name)return alert('Enter a name');
+ c.name=name;c.color=document.getElementById('tvs-color').value;c.cardSize=document.getElementById('tvs-size').value;c.showChart=document.getElementById('tvs-chart').value==='show';c.updatedAt=Date.now();save();trackerV2SettingsClose();render();
+}
+function trackerV2SettingsMove(step){
+ const id=document.getElementById('tracker-v2-settings')?.dataset.id,i=db.trackerCards.findIndex(x=>x.id===id),j=i+step;if(i<0||j<0||j>=db.trackerCards.length)return;
+ trackerV2Reorder(id,db.trackerCards[j].id);trackerV2Settings(id);
 }
 function trackerV2Edit(id){
  const card=db.trackerCards.find(c=>c.id===id);if(!card)return;
