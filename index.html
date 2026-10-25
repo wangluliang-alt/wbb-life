@@ -117,7 +117,7 @@ function summary(it,d=today()){if(it.type==='event')return (db.events?.[it.id]||
 const fmt=m=>{m=Math.round(m);return m>=60?Math.floor(m/60)+'h '+(m%60?m%60+'m':''):m+'m'};
 function minutes(a,b){if(!a||!b)return 0;let p=a.split(':').map(Number),q=b.split(':').map(Number),n=q[0]*60+q[1]-p[0]*60-p[1];return n<0?n+1440:n}
 function show(pageName,id){page=pageName;if(id)current=id;if(pageName!=='detail'){date=today();month=new Date().getMonth();year=new Date().getFullYear()}render();window.scrollTo(0,0)}
-function navigation(){nav.innerHTML=[['notes','☷','Do'],['things','≡','Things'],['home','⌂','Trackers'],['settings','⚙','Settings']].map(([k,ic,s])=>'<button class="'+(page===k?'active':'')+'" onclick="show(\''+k+'\')"><span>'+ic+'</span>'+s+'</button>').join('')}
+function navigation(){nav.innerHTML=[['notes','☷','Do'],['home','⌂','Trackers'],['things','≡','Things'],['settings','⚙','Settings']].map(([k,ic,s])=>'<button class="'+(page===k?'active':'')+'" onclick="show(\''+k+'\')"><span>'+ic+'</span>'+s+'</button>').join('')}
 
 // Things: plain-text collections and reusable notes, kept inside the existing cloud snapshot.
 let thingsSection=null,thingsDoc=null,thingsMovingDoc=null;
