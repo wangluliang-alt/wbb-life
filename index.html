@@ -60,6 +60,15 @@
 .things-v2-add{border:2px dashed #d4d9d8;border-radius:21px;min-height:205px;background:#ffffff8c;color:#7b8987;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:32px;cursor:pointer}.things-v2-add span{font-size:15px;margin-top:5px}
 .things-v2-moving{opacity:.6}.things-v2-drop{outline:3px dashed #e25d93;outline-offset:2px}
 @media(max-width:380px){.things-v2-grid{gap:9px}.things-v2-card{padding:12px 11px}.things-v2-open strong{font-size:18px}}
+.things-v2-wide{grid-column:1/-1}.things-v2-wide .things-v2-preview{max-width:100%}
+.things-card-settings-overlay{position:fixed;inset:0;background:#0006;z-index:2500;display:flex;align-items:center;justify-content:center;padding:18px}
+.things-card-settings-dialog{width:min(430px,100%);max-height:88dvh;overflow:auto;background:white;border-radius:22px;padding:23px;color:#263242;box-shadow:0 12px 35px #0002}
+.things-card-settings-dialog h2{margin:0 0 18px}.things-card-settings-dialog label{display:block;margin:14px 0;font-size:15px}
+.things-card-settings-dialog input:not([type=color]),.things-card-settings-dialog select{display:block;width:100%;margin-top:7px;padding:11px;border:1px solid #cbd5d0;border-radius:10px;font-size:16px;background:white}
+.things-card-settings-dialog input[type=color]{display:block;width:100%;height:43px;margin-top:7px;border:0;background:transparent}
+.tcs-label{font-size:15px;margin:14px 0 8px}.tcs-palette{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.tcs-swatch{height:37px;border:1px solid #0001;border-radius:10px;cursor:pointer}
+.tcs-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}.tcs-actions button{padding:10px 16px;border-radius:10px}
+.tcs-delete{border:0;background:none;color:#b34b60;padding:12px 0 0;font-size:14px;cursor:pointer}
 </style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script></head><body><div id="app" class="shell"></div><nav id="nav" class="bottom"></nav><script>
 const KEY='wbb-life-v1';
 const TYPES={event:['','Date + optional note','Record an event when it happens'],bool:['✅','Yes / No','A simple daily check-in'],number:['⚖️','Number','Measurements like weight'],counter:['🔢','Counter','Tap +1 whenever it happens'],duration:['⏱️','Duration','Minutes or hours per day'],interval:['🌙','Time range','Start and end; multiple per day'],journal:['📝','Journal','Daily written notes']};
@@ -156,8 +165,8 @@ function thingsHome(){
  thingsInit();
  const colors=['#ffdce9','#d2f2df','#d7edff','#fff0c8','#e9dcff'];
  return '<div class="section"><h2>Things</h2><button class="pill" onclick="thingsAddSection()">+ Add</button></div><div class="things-v2-grid">'+db.thingsSections.map((c,i)=>{
- const previews=(c.docs||[]).slice().sort((x,y)=>(y.updatedAt||0)-(x.updatedAt||0)).slice(0,3);
- return '<article class="things-v2-card" draggable="true" data-things-id="'+escapeHtml(c.id)+'" ondragstart="thingsV2DragStart(event)" ondragover="thingsV2DragOver(event)" ondrop="thingsV2Drop(event)" ondragend="thingsV2DragEnd(event)" style="background:'+escapeHtml(c.color||colors[i%colors.length])+'"><div class="things-v2-card-top"><span class="things-v2-grip" title="Drag to reorder" onpointerdown="thingsV2TouchStart(event)" onpointermove="thingsV2TouchMove(event)" onpointerup="thingsV2TouchEnd(event)" onpointercancel="thingsV2TouchCancel(event)">⠿</span></div><button class="things-v2-open" onclick="thingsOpenSection(\''+c.id+'\')"><strong>'+escapeHtml(c.name)+'</strong><small>'+(c.docs||[]).length+' notes</small><div class="things-v2-preview">'+(previews.length?previews.map(d=>'<span>'+escapeHtml(d.title||thingsPreview(d).slice(0,65)||'Untitled')+'</span>').join(''):'<span class="things-v2-muted">Add your first note</span>')+'</div></button></article>';
+ const previewCount=c.previewCount===0?0:([1,2,3].includes(Number(c.previewCount))?Number(c.previewCount):3);const previews=(c.docs||[]).slice().sort((x,y)=>(y.updatedAt||0)-(x.updatedAt||0)).slice(0,previewCount);
+ return '<article class="things-v2-card '+(c.cardSize==='wide'?'things-v2-wide':'')+'" draggable="true" data-things-id="'+escapeHtml(c.id)+'" ondragstart="thingsV2DragStart(event)" ondragover="thingsV2DragOver(event)" ondrop="thingsV2Drop(event)" ondragend="thingsV2DragEnd(event)" style="background:'+escapeHtml(c.color||colors[i%colors.length])+'"><div class="things-v2-card-top"><span class="things-v2-grip" title="Drag to reorder" onpointerdown="thingsV2TouchStart(event)" onpointermove="thingsV2TouchMove(event)" onpointerup="thingsV2TouchEnd(event)" onpointercancel="thingsV2TouchCancel(event)">⠿</span></div><button class="things-v2-open" onclick="thingsOpenSection(\''+c.id+'\')"><strong>'+escapeHtml(c.name)+'</strong><small>'+(c.docs||[]).length+' notes</small><div class="things-v2-preview">'+(previewCount===0?'':previews.length?previews.map(d=>'<span>'+escapeHtml(d.title||thingsPreview(d).slice(0,65)||'Untitled')+'</span>').join(''):'<span class="things-v2-muted">Add your first note</span>')+'</div></button></article>';
  }).join('')+'<button class="things-v2-add" onclick="thingsAddSection()">+<span>Add Category</span></button></div>';
 }
 let thingsV2Dragged=null,thingsV2Pointer=null;
@@ -195,17 +204,25 @@ function thingsV2TouchCancel(){
 }
 function thingsSectionManage(){
  const c=thingsFindSection();if(!c)return;
- const action=prompt('Manage '+c.name+': type Rename, Color, or Delete','Rename');
- if(!action)return;
- if(/^rename$/i.test(action.trim()))thingsRenameSection(c.id);
- else if(/^delete$/i.test(action.trim()))thingsDeleteSection(c.id);
- else if(/^color$/i.test(action.trim())){
-  const color=prompt('Enter a color (#RRGGBB)',c.color||'#ffdce9');
-  if(color===null)return;
-  if(!/^#[0-9a-f]{6}$/i.test(color.trim()))return alert('Use a six-digit hex color, for example #ffdce9.');
-  c.color=color.trim();c.updatedAt=Date.now();thingsTouch();thingsSave();
- }
+ document.getElementById('things-card-settings')?.remove();
+ const colors=['#ffdce9','#d2f2df','#d7edff','#fff0c8','#e9dcff','#ffe2d3','#d8f0f3','#f9dfed','#e5efcd','#f7e6ff'];
+ const color=c.color||colors[Math.max(0,db.thingsSections.findIndex(x=>x.id===c.id))%5];
+ document.body.insertAdjacentHTML('beforeend','<div id="things-card-settings" class="things-card-settings-overlay"><div class="things-card-settings-dialog"><h2>Card Settings</h2><label>Name<input id="tcs-name" maxlength="70"></label><div class="tcs-label">Card color</div><div class="tcs-palette">'+colors.map(v=>'<button type="button" class="tcs-swatch" style="background:'+v+'" data-color="'+v+'" onclick="thingsCardPickColor(this)" aria-label="Select color"></button>').join('')+'</div><label>Custom color<input type="color" id="tcs-color"></label><label>Card size<select id="tcs-size"><option value="normal">Normal · half row</option><option value="wide">Wide · full row</option></select></label><label>Preview<select id="tcs-preview"><option value="3">3 notes</option><option value="2">2 notes</option><option value="1">1 note</option><option value="0">Hide preview</option></select></label><div class="tcs-actions"><button type="button" onclick="thingsCardSettingsClose()">Cancel</button><button type="button" class="primary" onclick="thingsCardSettingsSave()">Save</button></div><button class="tcs-delete" type="button" onclick="thingsCardSettingsDelete()">Move category to Bin</button></div></div>');
+ document.getElementById('tcs-name').value=c.name;
+ document.getElementById('tcs-color').value=/^#[0-9a-f]{6}$/i.test(color)?color:'#ffdce9';
+ document.getElementById('tcs-size').value=c.cardSize==='wide'?'wide':'normal';
+ document.getElementById('tcs-preview').value=String([0,1,2,3].includes(Number(c.previewCount))?c.previewCount:3);
 }
+function thingsCardPickColor(btn){document.getElementById('tcs-color').value=btn.dataset.color}
+function thingsCardSettingsClose(){document.getElementById('things-card-settings')?.remove()}
+function thingsCardSettingsSave(){
+ const c=thingsFindSection();if(!c)return;
+ const name=document.getElementById('tcs-name').value.trim();
+ if(!name)return alert('Please enter a category name.');
+ c.name=name;c.color=document.getElementById('tcs-color').value;c.cardSize=document.getElementById('tcs-size').value;c.previewCount=Number(document.getElementById('tcs-preview').value);c.updatedAt=Date.now();
+ thingsTouch();save();thingsCardSettingsClose();render();
+}
+function thingsCardSettingsDelete(){const c=thingsFindSection();if(!c)return;thingsCardSettingsClose();thingsDeleteSection(c.id);if(!db.thingsSections.some(x=>x.id===c.id))show('things')}
 let thingsSwipeX=0,thingsSwipeY=0;
 function thingsSwipeStart(e){thingsSwipeX=e.changedTouches[0].clientX;thingsSwipeY=e.changedTouches[0].clientY}
 function thingsSwipeEnd(e){let dx=e.changedTouches[0].clientX-thingsSwipeX,dy=e.changedTouches[0].clientY-thingsSwipeY;if(Math.abs(dx)<45||Math.abs(dx)<Math.abs(dy)*1.3)return;let row=e.currentTarget.closest('.things-swipe');document.querySelectorAll('.things-swipe').forEach(x=>{if(x!==row)x.classList.remove('swiped-left','swiped-right')});row.classList.remove('swiped-left','swiped-right');row.classList.add(dx<0?'swiped-left':'swiped-right')}
