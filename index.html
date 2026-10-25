@@ -471,6 +471,13 @@ async function cloudInit(){let c=cloudClient();if(!c){cloudStatus='Cloud library
 async function cloudLogin(){let email=document.getElementById('cloud-email').value.trim(),password=document.getElementById('cloud-password').value;if(!email||!password)return alert('Enter email and password');let c=cloudClient();if(!c)return alert('Cloud library unavailable');let {data,error}=await c.auth.signInWithPassword({email,password});if(error)return alert(error.message);cloudUser=data.user;await cloudSync();render()}
 async function cloudLogout(){if(!confirm('Sign out on this device? Local data remains.'))return;await cloudClient().auth.signOut();cloudUser=null;cloudStatus='Not signed in';render()}
 function cloudChanged(){if(!cloudUser)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudSync,1200)}
+function safeCloudRender(){
+ // Rebuilding the Do page while a textarea has focus destroys the input,
+ // moves the caret, and makes iOS jump to the top during typing.
+ const active=document.activeElement;
+ if(page==='notes'&&active&&active.matches('textarea.note-text'))return;
+ if(page!=='new'&&page!=='edit'&&page!=='things-doc')render();
+}
 async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cloudBusy=true;cloudStatus='Syncing…';try{let c=cloudClient(),res=await c.from('life_snapshots').select('payload').eq('user_id',cloudUser.id).maybeSingle();if(res.error)throw res.error;let version=cloudDirty,remote=res.data?.payload||null;
  // First connection on a device must be a READ, not a write of stale local defaults.
  // Preserve its previous local data for recovery instead of uploading it over the account.
@@ -484,7 +491,7 @@ async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cl
    localStorage.setItem(KEY,JSON.stringify(db));
    localStorage.setItem(syncBaseKey,JSON.stringify(remote));
    cloudStatus='Synced '+new Date().toLocaleTimeString();
-   if(page!=='new'&&page!=='edit'&&page!=='things-doc')render();
+   safeCloudRender();
    return;
  }
  // A device with no edits since its last sync should simply download the cloud
@@ -494,7 +501,7 @@ async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cl
    localStorage.setItem(KEY,JSON.stringify(db));
    localStorage.setItem(syncBaseKey,JSON.stringify(remote));
    cloudStatus='Synced '+new Date().toLocaleTimeString();
-   if(page!=='new'&&page!=='edit'&&page!=='things-doc')render();
+   safeCloudRender();
    return;
  }
 
@@ -596,7 +603,7 @@ async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cl
  for(const id of deletedTrackerIds)delete merged.records?.[id];
 
 
- if(incoming.thingsSections&&remote?.thingsSections&&Number(incoming.thingsUpdatedAt||0)>=Number(remote.thingsUpdatedAt||0)){merged.thingsSections=incoming.thingsSections.filter(x=>!new Set(merged.deletedThingsSections||[]).has(x.id)).map(c=>({...c,docs:(c.docs||[]).filter(d=>!new Set(merged.deletedThingsDocs||[]).has(d.id))}));merged.thingsUpdatedAt=incoming.thingsUpdatedAt||0}let w=await c.from('life_snapshots').upsert({user_id:cloudUser.id,payload:merged,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(w.error)throw w.error;db=cloudDirty===version?merged:mergeLife(db,merged);localStorage.setItem(KEY,JSON.stringify(db));localStorage.setItem('wbb-life-sync-base-'+cloudUser.id,JSON.stringify(merged));if(cloudDirty!==version)setTimeout(cloudSync,1500);cloudStatus='Synced '+new Date().toLocaleTimeString();if(page!=='new'&&page!=='edit'&&page!=='things-doc')render()}catch(e){cloudStatus='Sync error: '+e.message;if(page==='settings')render()}finally{cloudBusy=false}}
+ if(incoming.thingsSections&&remote?.thingsSections&&Number(incoming.thingsUpdatedAt||0)>=Number(remote.thingsUpdatedAt||0)){merged.thingsSections=incoming.thingsSections.filter(x=>!new Set(merged.deletedThingsSections||[]).has(x.id)).map(c=>({...c,docs:(c.docs||[]).filter(d=>!new Set(merged.deletedThingsDocs||[]).has(d.id))}));merged.thingsUpdatedAt=incoming.thingsUpdatedAt||0}let w=await c.from('life_snapshots').upsert({user_id:cloudUser.id,payload:merged,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(w.error)throw w.error;db=cloudDirty===version?merged:mergeLife(db,merged);localStorage.setItem(KEY,JSON.stringify(db));localStorage.setItem('wbb-life-sync-base-'+cloudUser.id,JSON.stringify(merged));if(cloudDirty!==version)setTimeout(cloudSync,1500);cloudStatus='Synced '+new Date().toLocaleTimeString();safeCloudRender()}catch(e){cloudStatus='Sync error: '+e.message;if(page==='settings')render()}finally{cloudBusy=false}}
 function cloudPanel(){return '<div class="card"><h2>Cloud sync ☁️</h2><p>Same account, same records on iPhone, iPad and Mac.</p><p class="muted">'+escapeHtml(cloudStatus)+'</p>'+(cloudUser?'<p>'+escapeHtml(cloudUser.email||'Signed in')+'</p><button class="primary" onclick="cloudSync()">Sync now</button> <button class="secondary" onclick="cloudLogout()">Sign out</button>':'<label class="field">Email<input id="cloud-email" type="email"></label><label class="field">Password<input id="cloud-password" type="password"></label><button class="primary" onclick="cloudLogin()">Sign in</button><p class="muted">Private account only; no public signup.</p>')+'</div>'}
 
 function sizeNoteTextareas(){document.querySelectorAll('textarea.note-text').forEach(el=>{el.style.height='auto';el.style.height=el.scrollHeight+'px'})}
