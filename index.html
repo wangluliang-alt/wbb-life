@@ -38,7 +38,18 @@
 .notes-overview-card>strong{display:block;flex:none}
 .notes-overview-items{flex:none;text-align:left}
 .things-direct-delete{border:0;background:transparent;color:#a63f56;font-size:14px;padding:8px;cursor:pointer}
-.trackers-blank{min-height:calc(100dvh - 145px);background:transparent}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script></head><body><div id="app" class="shell"></div><nav id="nav" class="bottom"></nav><script>
+.trackers-blank{min-height:calc(100dvh - 145px);background:transparent}
+.tracker-v2-head{display:flex;align-items:center;justify-content:space-between;margin:10px 0 16px}.tracker-v2-head h2{margin:0;font-size:27px}.tracker-v2-head span{color:#66716d}
+.tracker-v2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0 34px}
+.tracker-v2-card{border-radius:21px;padding:18px 16px;min-width:0;box-shadow:0 3px 12px #00000008}
+.tracker-v2-open{display:flex;flex-direction:column;align-items:flex-start;width:100%;border:0;background:none;color:#253044;text-align:left;padding:0;cursor:pointer}
+.tracker-v2-title{font-size:18px;font-weight:750}.tracker-v2-value{font-size:29px;font-weight:800;margin-top:14px;line-height:1.2}.tracker-v2-hint{font-size:12px;opacity:.65;margin-top:6px}
+.tracker-v2-chart{display:block;width:100%;height:90px;margin-top:8px}.tracker-v2-empty{height:90px;display:flex;align-items:center;justify-content:center;color:#76817d;font-size:12px;text-align:center}
+.tracker-v2-add{border:2px dashed #d4d9d8;border-radius:21px;min-height:190px;background:#ffffff8c;color:#7b8987;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:34px;cursor:pointer}.tracker-v2-add span{font-size:15px;margin-top:5px}
+.tracker-v2-overlay{position:fixed;inset:0;background:#0006;z-index:2000;display:flex;align-items:center;justify-content:center;padding:18px}
+.tracker-v2-dialog{width:min(420px,100%);background:#fff;border-radius:22px;padding:24px;color:#26313d}.tracker-v2-dialog h2{margin:0}.tracker-v2-dialog p{color:#73817d}.tracker-v2-dialog label{display:block;margin:15px 0;font-size:15px}.tracker-v2-dialog input{display:block;width:100%;padding:12px;margin-top:7px;border:1px solid #cbd5d0;border-radius:10px;font-size:18px}.tracker-v2-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:20px}.tracker-v2-actions button{padding:10px;border-radius:10px}
+@media(max-width:380px){.tracker-v2-grid{gap:9px}.tracker-v2-card{padding:13px 10px}.tracker-v2-value{font-size:24px}}
+</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script></head><body><div id="app" class="shell"></div><nav id="nav" class="bottom"></nav><script>
 const KEY='wbb-life-v1';
 const TYPES={event:['','Date + optional note','Record an event when it happens'],bool:['✅','Yes / No','A simple daily check-in'],number:['⚖️','Number','Measurements like weight'],counter:['🔢','Counter','Tap +1 whenever it happens'],duration:['⏱️','Duration','Minutes or hours per day'],interval:['🌙','Time range','Start and end; multiple per day'],journal:['📝','Journal','Daily written notes']};
 const starter=[['Weight','number','⚖️','kg'],['Reading','bool','📚',''],['Exercise','duration','🏃','min'],['Water','counter','💧','times'],['Sleep','interval','🌙','']];
@@ -289,7 +300,71 @@ function thingsDeleteDoc(){const id=thingsDoc;thingsDeleteDocById(id);if(!things
 
 function tiles(){return '<div class="grid-cards">'+db.items.map(it=>'<button class="track" onclick="show(\'detail\',\''+it.id+'\')"><span class="grow"><strong>'+escapeHtml(it.name)+'</strong><small>'+(KINDS[kindOf(it)]?.[1]||TYPES[it.type][1])+'</small></span><span class="value">'+escapeHtml(summary(it))+' ›</span></button>').join('')+'</div>'}
 function legacyHome(){let n=db.items.filter(x=>rec(x.id,today())!=null).length;return head('A little life, every day.','Your personal space to notice the little things. 🌿')+'<div class="card hero"><div class="flower">🌼</div><div class="eyebrow">TODAY · '+new Date().toLocaleDateString('en-SG',{weekday:'long',month:'long',day:'numeric'})+'</div><p style="margin:17px 0 5px"><strong>Make today yours.</strong></p><div class="muted">'+n+' of '+db.items.length+' trackers recorded today</div></div><div class="section"><h2>Your trackers</h2><button class="pill" onclick="show(\'new\')">+ Add</button></div>'+tiles()+(db.items.length?'':'<div class="card empty-state">Create your first tracker 🌸</div>')}
-function home(){return '<div class="trackers-blank" aria-label="Trackers"></div>'}
+
+const TRACKER_V2_DEFAULTS=[
+ {id:'v2-weight',name:'Weight',type:'number',unit:'kg',color:'#ffe1eb'},
+ {id:'v2-sleep',name:'Sleep',type:'sleep',unit:'h',color:'#dceeff'},
+ {id:'v2-exercise',name:'Exercise',type:'minutes',unit:'min',color:'#def5df'},
+ {id:'v2-reading',name:'Reading',type:'minutes',unit:'min',color:'#fff0dd'},
+ {id:'v2-study',name:'Study',type:'minutes',unit:'min',color:'#eee2ff'}
+];
+function trackerV2Init(){
+ if(!Array.isArray(db.trackerCards)){db.trackerCards=TRACKER_V2_DEFAULTS.map(x=>({...x}));db.trackerCardRecords={};save()}
+ db.trackerCardRecords ||= {};
+}
+function trackerV2Value(card,day){
+ const v=db.trackerCardRecords?.[card.id]?.[day];
+ if(v==null)return null;
+ if(card.type==='sleep')return v&&v.start&&v.end?minutes(v.start,v.end):null;
+ return Number.isFinite(Number(v))?Number(v):null;
+}
+function trackerV2Label(card,day){
+ const n=trackerV2Value(card,day);if(n===null)return '—';
+ if(card.type==='sleep')return fmt(n);
+ if(card.type==='minutes')return fmt(n);
+ return String(n)+' '+(card.unit||'');
+}
+function trackerV2Chart(card){
+ const vals=Array.from({length:7},(_,i)=>{let d=new Date(homeDate+'T12:00:00');d.setDate(d.getDate()-6+i);return trackerV2Value(card,iso(d))});
+ const known=vals.filter(v=>v!==null);
+ if(!known.length)return '<div class="tracker-v2-empty">No records yet · last 7 days</div>';
+ const w=280,h=88,lo=card.type==='number'?Math.min(...known)-0.6:0,hi=Math.max(...known,card.type==='number'?Math.max(...known)+0.6:1),scale=v=>76-(v-lo)/Math.max(hi-lo,0.1)*58;
+ if(card.type==='number'){
+   let segments=[],part=[];vals.forEach((v,i)=>{if(v===null){if(part.length)segments.push(part);part=[]}else part.push([16+i*41,scale(v)])});if(part.length)segments.push(part);
+   return '<svg class="tracker-v2-chart" viewBox="0 0 '+w+' '+h+'" aria-label="Seven day trend">'+segments.map(p=>p.length>1?'<polyline points="'+p.map(x=>x.join(',')).join(' ')+'" fill="none" stroke="#ef6193" stroke-width="3" stroke-linecap="round"/>':'').join('')+vals.map((v,i)=>v===null?'':'<circle cx="'+(16+i*41)+'" cy="'+scale(v)+'" r="4" fill="#ef6193"/>').join('')+'</svg>';
+ }
+ return '<svg class="tracker-v2-chart" viewBox="0 0 '+w+' '+h+'" aria-label="Seven day trend">'+vals.map((v,i)=>v===null?'':'<rect x="'+(8+i*41)+'" y="'+scale(v)+'" width="24" height="'+Math.max(3,76-scale(v))+'" rx="5" fill="#65a7a1"/>').join('')+'</svg>';
+}
+function trackerV2Card(card){
+ return '<article class="tracker-v2-card" style="background:'+escapeHtml(card.color||'#f5f0f4')+'"><button class="tracker-v2-open" onclick="trackerV2Edit(\''+card.id+'\')"><span class="tracker-v2-title">'+escapeHtml(card.name)+'</span><span class="tracker-v2-value">'+escapeHtml(trackerV2Label(card,homeDate))+'</span><span class="tracker-v2-hint">Tap to record</span></button>'+trackerV2Chart(card)+'</article>';
+}
+function home(){
+ trackerV2Init();
+ return '<div class="tracker-v2-head"><h2>Trackers</h2><span>'+new Date(homeDate+'T12:00:00').toLocaleDateString('en-SG',{day:'numeric',month:'short',year:'numeric'})+'</span></div>'+homeWeek()+'<div class="tracker-v2-grid">'+db.trackerCards.map(trackerV2Card).join('')+'<button class="tracker-v2-add" onclick="trackerV2Add()">＋<span>Add Tracker</span></button></div>';
+}
+function trackerV2Edit(id){
+ const card=db.trackerCards.find(c=>c.id===id);if(!card)return;
+ const value=db.trackerCardRecords?.[id]?.[homeDate],sleep=card.type==='sleep';
+ const fields=sleep?'<label>Sleep start<input type="time" id="tv2-start" value="'+escapeHtml(value?.start||'23:00')+'"></label><label>Wake time<input type="time" id="tv2-end" value="'+escapeHtml(value?.end||'07:00')+'"></label>':'<label>Value ('+escapeHtml(card.unit||'')+')<input id="tv2-number" type="number" min="0" step="'+(card.type==='number'?'0.1':'1')+'" value="'+(value??'')+'" placeholder="Enter value"></label>';
+ document.body.insertAdjacentHTML('beforeend','<div class="tracker-v2-overlay" id="tracker-v2-overlay"><div class="tracker-v2-dialog"><h2>'+escapeHtml(card.name)+'</h2><p>'+escapeHtml(homeDate)+'</p>'+fields+'<div class="tracker-v2-actions"><button onclick="trackerV2Close()">Cancel</button><button onclick="trackerV2Clear(\''+id+'\')">Clear</button><button class="primary" onclick="trackerV2Save(\''+id+'\')">Save</button></div></div></div>');
+}
+function trackerV2Close(){document.getElementById('tracker-v2-overlay')?.remove()}
+function trackerV2Save(id){
+ const card=db.trackerCards.find(c=>c.id===id);if(!card)return;
+ let v;
+ if(card.type==='sleep'){let start=document.getElementById('tv2-start').value,end=document.getElementById('tv2-end').value;if(!start||!end||start===end)return alert('Enter different sleep and wake times.');v={start,end}}
+ else {let raw=document.getElementById('tv2-number').value;if(raw.trim()==='')return alert('Enter a value or choose Clear.');v=Number(raw);if(!Number.isFinite(v)||v<0)return alert('Enter a valid number.')}
+ db.trackerCardRecords ||= {};db.trackerCardRecords[id] ||= {};db.trackerCardRecords[id][homeDate]=v;save();trackerV2Close();render();
+}
+function trackerV2Clear(id){if(!confirm('Clear this day’s record?'))return;if(db.trackerCardRecords?.[id])delete db.trackerCardRecords[id][homeDate];save();trackerV2Close();render()}
+function trackerV2Add(){
+ const name=prompt('New tracker name');if(!name?.trim())return;
+ const type=prompt('Tracking type: number, minutes, or sleep','minutes');if(type===null)return;
+ if(!['number','minutes','sleep'].includes(type.toLowerCase().trim()))return alert('Choose number, minutes, or sleep.');
+ const t=type.toLowerCase().trim(),unit=t==='number'?(prompt('Unit (e.g. kg, pages)','')||''):t==='minutes'?'min':'h';
+ db.trackerCards.push({id:'v2-'+uid(),name:name.trim().slice(0,45),type:t,unit,color:['#ffe1eb','#dceeff','#def5df','#fff0dd','#eee2ff'][db.trackerCards.length%5]});save();render();
+}
+
 function all(){return head('Your little collection','Everything you choose to keep track of, in one place.')+'<div class="section"><h2>All trackers</h2><button class="pill" onclick="show(\'new\')">+ New</button></div>'+tiles()}
 function calendar(it){let offset=(new Date(year,month,1).getDay()+6)%7,max=new Date(year,month+1,0).getDate();let s='<div class="calendarHead"><button onclick="shift(-1)">‹</button><strong>'+new Date(year,month).toLocaleDateString('en-SG',{month:'long',year:'numeric'})+'</strong><button onclick="shift(1)">›</button></div><div class="calendar">'+['M','T','W','T','F','S','S'].map(x=>'<div class="dayname">'+x+'</div>').join('');for(let i=0;i<offset;i++)s+='<div class="day empty"></div>';for(let i=1;i<=max;i++){let d=iso(new Date(year,month,i)),v=rec(it.id,d);s+='<button class="day '+(d===date?'selected ': '')+(v!=null?'has':'')+'" onclick="choose(\''+d+'\')">'+i+(v!=null?'<small>'+escapeHtml(it.type==='bool'?(v?'✓':'—'):it.type==='interval'?fmt(v.reduce((a,x)=>a+minutes(x.start,x.end),0)):it.type==='duration'?fmt(v):v)+'</small>':'')+'</button>'}return s+'</div>'}
 function detail(){let it=item(current);if(!it){show('home');return ''}if(it.type==='event')return eventDetail(it);let v=rec(it.id,date),form='';
@@ -438,6 +513,11 @@ const CLOUD_URL='https://dvfnbeuwnuvnynrgvugf.supabase.co', CLOUD_KEY='sb_publis
 function cloudClient(){if(!cloud&&window.supabase)cloud=window.supabase.createClient(CLOUD_URL,CLOUD_KEY);return cloud}
 function mergeLife(local,remote){
  let out=JSON.parse(JSON.stringify(remote||{}));
+ // The new tracker dashboard is separate from legacy tracker categories.
+ const cardsById=new Map([...(remote?.trackerCards||[]),...(local.trackerCards||[])].map(c=>[c.id,c]));
+ if(cardsById.size)out.trackerCards=[...cardsById.values()];
+ out.trackerCardRecords={...(remote?.trackerCardRecords||{})};
+ for(const [id,dates] of Object.entries(local.trackerCardRecords||{}))out.trackerCardRecords[id]={...(out.trackerCardRecords[id]||{}),...dates};
  out.deletedItems=[...new Set([...(remote?.deletedItems||[]),...(local.deletedItems||[])])];
  out.deletedCategories=[...new Set([...(remote?.deletedCategories||[]),...(local.deletedCategories||[])])];
  out.deletedNotes=[...new Set([...(remote?.deletedNotes||[]),...(local.deletedNotes||[])])];
