@@ -51,6 +51,15 @@
 @media(max-width:380px){.tracker-v2-grid{gap:9px}.tracker-v2-card{padding:13px 10px}.tracker-v2-value{font-size:24px}}
 .tracker-v2-dialog{max-height:min(85dvh,750px);overflow-y:auto}.tv2-sleep-row{border:1px solid #e3e7e5;border-radius:14px;padding:12px;margin:12px 0}.tv2-sleep-times{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tv2-sleep-times input{min-width:0;font-size:15px}.tv2-note{width:100%;min-height:60px;border:1px solid #cbd5d0;border-radius:10px;padding:10px;font:inherit;resize:vertical}.tv2-add,.tv2-remove{background:transparent;border:0;color:#a14976;cursor:pointer;padding:8px}.tv2-remove{font-size:13px}
 .tracker-v2-top{display:flex;justify-content:flex-end;height:14px}.tracker-v2-grip{font-size:19px;color:#677674;cursor:grab;touch-action:none;user-select:none;line-height:16px;padding:0 2px}.tracker-v2-moving{opacity:.65}.tracker-v2-drop-target{outline:3px dashed #e25d93;outline-offset:2px}
+.things-v2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0 34px}
+.things-v2-card{border-radius:21px;min-width:0;min-height:205px;padding:15px 17px;box-shadow:0 3px 12px #00000008}
+.things-v2-card-top{display:flex;justify-content:flex-end;height:17px}.things-v2-grip{cursor:grab;touch-action:none;user-select:none;color:#71827b;font-size:20px;line-height:18px}
+.things-v2-open{display:block;text-align:left;background:transparent;border:0;padding:0;width:100%;color:#263242;cursor:pointer}
+.things-v2-open strong{display:block;font-size:21px;margin-bottom:5px}.things-v2-open small{font-size:13px;color:#65716f}
+.things-v2-preview{display:flex;flex-direction:column;gap:8px;margin-top:16px}.things-v2-preview span{font-size:14px;line-height:1.35;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.things-v2-preview span:before{content:"• ";opacity:.55}.things-v2-preview .things-v2-muted{color:#77847f}
+.things-v2-add{border:2px dashed #d4d9d8;border-radius:21px;min-height:205px;background:#ffffff8c;color:#7b8987;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:32px;cursor:pointer}.things-v2-add span{font-size:15px;margin-top:5px}
+.things-v2-moving{opacity:.6}.things-v2-drop{outline:3px dashed #e25d93;outline-offset:2px}
+@media(max-width:380px){.things-v2-grid{gap:9px}.things-v2-card{padding:12px 11px}.things-v2-open strong{font-size:18px}}
 </style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script></head><body><div id="app" class="shell"></div><nav id="nav" class="bottom"></nav><script>
 const KEY='wbb-life-v1';
 const TYPES={event:['','Date + optional note','Record an event when it happens'],bool:['✅','Yes / No','A simple daily check-in'],number:['⚖️','Number','Measurements like weight'],counter:['🔢','Counter','Tap +1 whenever it happens'],duration:['⏱️','Duration','Minutes or hours per day'],interval:['🌙','Time range','Start and end; multiple per day'],journal:['📝','Journal','Daily written notes']};
@@ -143,7 +152,60 @@ async function thingsImportFile(event){
   alert('Imported '+count+' notes. Please check Things on your other device after syncing.');render();
  }catch(e){alert('Import stopped: '+e.message)}
 }
-function thingsHome(){thingsInit();return '<div class="section"><h2>Things</h2><div><button class="pill" onclick="thingsAddSection()">+ Add</button></div></div><input id="things-import-file" type="file" accept=".json,application/json" style="display:none" onchange="thingsImportFile(event)"><div class="things-list">'+db.thingsSections.map((c,i)=>'<div class="things-swipe" data-things-id="'+c.id+'"><div class="things-swipe-actions"><button class="things-swipe-edit" onclick="thingsRenameSection(\''+c.id+'\')">Edit</button><button class="things-swipe-delete" onclick="thingsDeleteSection(\''+c.id+'\')">Delete</button></div><div class="things-tile" style="background:'+['#ffdce9','#d2f2df','#d7edff','#fff0c8','#e9dcff'][i%5]+'" ontouchstart="thingsSwipeStart(event)" ontouchend="thingsSwipeEnd(event)"><button class="things-title" onclick="thingsOpenSection(\''+c.id+'\')">'+escapeHtml(c.name)+'</button><button class="things-move" onclick="thingsMoveSection(\''+c.id+'\',-1)" aria-label="Move up">↑</button><button class="things-move" onclick="thingsMoveSection(\''+c.id+'\',1)" aria-label="Move down">↓</button><button class="things-move" onclick="thingsRenameSection(\''+c.id+'\')" aria-label="Rename">Rename</button><button class="things-direct-delete" onclick="thingsDeleteSection(\''+c.id+'\')">Delete</button></div></div>').join('')+'</div>'}
+function thingsHome(){
+ thingsInit();
+ const colors=['#ffdce9','#d2f2df','#d7edff','#fff0c8','#e9dcff'];
+ return '<div class="section"><h2>Things</h2><button class="pill" onclick="thingsAddSection()">+ Add</button></div><div class="things-v2-grid">'+db.thingsSections.map((c,i)=>{
+ const previews=(c.docs||[]).slice().sort((x,y)=>(y.updatedAt||0)-(x.updatedAt||0)).slice(0,3);
+ return '<article class="things-v2-card" draggable="true" data-things-id="'+escapeHtml(c.id)+'" ondragstart="thingsV2DragStart(event)" ondragover="thingsV2DragOver(event)" ondrop="thingsV2Drop(event)" ondragend="thingsV2DragEnd(event)" style="background:'+escapeHtml(c.color||colors[i%colors.length])+'"><div class="things-v2-card-top"><span class="things-v2-grip" title="Drag to reorder" onpointerdown="thingsV2TouchStart(event)" onpointermove="thingsV2TouchMove(event)" onpointerup="thingsV2TouchEnd(event)" onpointercancel="thingsV2TouchCancel(event)">⠿</span></div><button class="things-v2-open" onclick="thingsOpenSection(\''+c.id+'\')"><strong>'+escapeHtml(c.name)+'</strong><small>'+(c.docs||[]).length+' notes</small><div class="things-v2-preview">'+(previews.length?previews.map(d=>'<span>'+escapeHtml(d.title||thingsPreview(d).slice(0,65)||'Untitled')+'</span>').join(''):'<span class="things-v2-muted">Add your first note</span>')+'</div></button></article>';
+ }).join('')+'<button class="things-v2-add" onclick="thingsAddSection()">+<span>Add Category</span></button></div>';
+}
+let thingsV2Dragged=null,thingsV2Pointer=null;
+function thingsV2Reorder(from,to){
+ if(!from||!to||from===to)return;
+ const list=db.thingsSections,i=list.findIndex(c=>c.id===from),j=list.findIndex(c=>c.id===to);
+ if(i<0||j<0)return;
+ const [card]=list.splice(i,1);list.splice(j,0,card);
+ db.thingsOrderUpdatedAt=Date.now();thingsTouch();save();render();
+}
+function thingsV2DragStart(e){thingsV2Dragged=e.currentTarget.dataset.thingsId;e.dataTransfer.effectAllowed='move'}
+function thingsV2DragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move'}
+function thingsV2Drop(e){e.preventDefault();thingsV2Reorder(thingsV2Dragged,e.currentTarget.dataset.thingsId);thingsV2Dragged=null}
+function thingsV2DragEnd(){thingsV2Dragged=null}
+function thingsV2TouchStart(e){
+ if(e.pointerType==='mouse')return;
+ const grip=e.currentTarget,card=grip.closest('.things-v2-card');if(!card)return;
+ thingsV2Pointer={id:e.pointerId,from:card.dataset.thingsId,grip};
+ grip.setPointerCapture(e.pointerId);card.classList.add('things-v2-moving');
+}
+function thingsV2TouchMove(e){
+ if(!thingsV2Pointer||thingsV2Pointer.id!==e.pointerId)return;
+ document.querySelectorAll('.things-v2-drop').forEach(x=>x.classList.remove('things-v2-drop'));
+ const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('.things-v2-card');
+ if(target&&target.dataset.thingsId!==thingsV2Pointer.from)target.classList.add('things-v2-drop');
+}
+function thingsV2TouchEnd(e){
+ if(!thingsV2Pointer||thingsV2Pointer.id!==e.pointerId)return;
+ const from=thingsV2Pointer.from,target=document.elementFromPoint(e.clientX,e.clientY)?.closest('.things-v2-card');
+ thingsV2TouchCancel();if(target)thingsV2Reorder(from,target.dataset.thingsId);
+}
+function thingsV2TouchCancel(){
+ document.querySelectorAll('.things-v2-moving,.things-v2-drop').forEach(x=>x.classList.remove('things-v2-moving','things-v2-drop'));
+ thingsV2Pointer=null;
+}
+function thingsSectionManage(){
+ const c=thingsFindSection();if(!c)return;
+ const action=prompt('Manage '+c.name+': type Rename, Color, or Delete','Rename');
+ if(!action)return;
+ if(/^rename$/i.test(action.trim()))thingsRenameSection(c.id);
+ else if(/^delete$/i.test(action.trim()))thingsDeleteSection(c.id);
+ else if(/^color$/i.test(action.trim())){
+  const color=prompt('Enter a color (#RRGGBB)',c.color||'#ffdce9');
+  if(color===null)return;
+  if(!/^#[0-9a-f]{6}$/i.test(color.trim()))return alert('Use a six-digit hex color, for example #ffdce9.');
+  c.color=color.trim();c.updatedAt=Date.now();thingsTouch();thingsSave();
+ }
+}
 let thingsSwipeX=0,thingsSwipeY=0;
 function thingsSwipeStart(e){thingsSwipeX=e.changedTouches[0].clientX;thingsSwipeY=e.changedTouches[0].clientY}
 function thingsSwipeEnd(e){let dx=e.changedTouches[0].clientX-thingsSwipeX,dy=e.changedTouches[0].clientY-thingsSwipeY;if(Math.abs(dx)<45||Math.abs(dx)<Math.abs(dy)*1.3)return;let row=e.currentTarget.closest('.things-swipe');document.querySelectorAll('.things-swipe').forEach(x=>{if(x!==row)x.classList.remove('swiped-left','swiped-right')});row.classList.remove('swiped-left','swiped-right');row.classList.add(dx<0?'swiped-left':'swiped-right')}
@@ -215,7 +277,7 @@ async function thingsRestoreShopping(){
 }
 function thingsSectionPage(){
  let c=thingsFindSection();if(!c)return thingsHome();
- return '<div class="section"><button class="back" onclick="show(\'things\')">← Things</button><div>'+'<button class="pill" onclick="thingsAddDoc()">+ Note</button></div></div><h2 class="things-collection-heading">'+escapeHtml(c.name)+'</h2>'+(thingsMovingDoc?'<p class="muted">Select another card to place the selected note before it. Tap ↕ again to cancel.</p>':'')+'<div class="things-card-grid">'+(c.docs||[]).map(d=>'<div class="things-card-shell '+(thingsMovingDoc===d.id?'things-moving':'')+'" ontouchstart="thingsCardTouchStart(event)" ontouchend="thingsCardTouchEnd(event)" ondragover="thingsCardDragOver(event)" ondrop="thingsCardDrop(event,\''+d.id+'\')"><div class="things-card-delete"><button onclick="thingsDeleteDocById(\''+d.id+'\')">Delete</button></div><button class="things-note-card" onclick="thingsCardOpenOrMove(\''+d.id+'\')"><strong>'+escapeHtml(d.title||'Untitled')+'</strong><span>'+escapeHtml(thingsPreview(d))+'</span></button><div class="things-card-controls"><button onclick="thingsMoveDoc(\''+d.id+'\',-1)" aria-label="Move up">↑</button><button onclick="thingsMoveDoc(\''+d.id+'\',1)" aria-label="Move down">↓</button><button onclick="thingsPickMove(\''+d.id+'\')" aria-label="Select card to move" title="Move">↕</button><button onclick="thingsCardMenu(this)" aria-label="More options">···</button><div class="things-card-menu" hidden><button onclick="thingsDeleteDocById(\''+d.id+'\')">Delete</button></div></div></div>').join('')+'</div>';
+ return '<div class="section"><button class="back" onclick="show(\'things\')">← Things</button><div><button class="secondary" onclick="thingsSectionManage()">Manage</button> <button class="pill" onclick="thingsAddDoc()">+ Note</button></div></div><h2 class="things-collection-heading">'+escapeHtml(c.name)+'</h2>'+(thingsMovingDoc?'<p class="muted">Select another card to place the selected note before it. Tap ↕ again to cancel.</p>':'')+'<div class="things-card-grid">'+(c.docs||[]).map(d=>'<div class="things-card-shell '+(thingsMovingDoc===d.id?'things-moving':'')+'" ontouchstart="thingsCardTouchStart(event)" ontouchend="thingsCardTouchEnd(event)" ondragover="thingsCardDragOver(event)" ondrop="thingsCardDrop(event,\''+d.id+'\')"><div class="things-card-delete"><button onclick="thingsDeleteDocById(\''+d.id+'\')">Delete</button></div><button class="things-note-card" onclick="thingsCardOpenOrMove(\''+d.id+'\')"><strong>'+escapeHtml(d.title||'Untitled')+'</strong><span>'+escapeHtml(thingsPreview(d))+'</span></button><div class="things-card-controls"><button onclick="thingsMoveDoc(\''+d.id+'\',-1)" aria-label="Move up">↑</button><button onclick="thingsMoveDoc(\''+d.id+'\',1)" aria-label="Move down">↓</button><button onclick="thingsPickMove(\''+d.id+'\')" aria-label="Select card to move" title="Move">↕</button><button onclick="thingsCardMenu(this)" aria-label="More options">···</button><div class="things-card-menu" hidden><button onclick="thingsDeleteDocById(\''+d.id+'\')">Delete</button></div></div></div>').join('')+'</div>';
 }
 function thingsPickMove(id){thingsMovingDoc=thingsMovingDoc===id?null:id;render()}
 function thingsCardOpenOrMove(id){if(!thingsMovingDoc){thingsOpenDoc(id);return}if(thingsMovingDoc===id){thingsMovingDoc=null;render();return}thingsMoveDocTo(thingsMovingDoc,id);thingsMovingDoc=null;render()}
@@ -300,7 +362,7 @@ function thingsRemoveCheck(id){let d=thingsFindDoc();d.checks=d.checks.filter(x=
 function thingsMoveDoc(id,n){let c=thingsFindSection(),i=c.docs.findIndex(x=>x.id===id),j=i+n;if(j<0||j>=c.docs.length)return;[c.docs[i],c.docs[j]]=[c.docs[j],c.docs[i]];c.updatedAt=Date.now();thingsTouch();thingsSave()}
 function thingsDeleteDoc(){const id=thingsDoc;thingsDeleteDocById(id);if(!thingsFindDoc())thingsOpenSection(thingsSection)}
 
-function tiles(){return '<div class="grid-cards">'+db.items.map(it=>'<button class="track" onclick="show(\'detail\',\''+it.id+'\')"><span class="grow"><strong>'+escapeHtml(it.name)+'</strong><small>'+(KINDS[kindOf(it)]?.[1]||TYPES[it.type][1])+'</small></span><span class="value">'+escapeHtml(summary(it))+' ›</span></button>').join('')+'</div>'}
+function tiles(){return '<div class="grid-cards">'+db.items.map(it=>'<button class="track" onclick="'+(it.id.startsWith('v2-')?'show(\'home\')':'show(\'detail\',\''+it.id+'\')')+'"><span class="grow"><strong>'+escapeHtml(it.name)+'</strong><small>'+(KINDS[kindOf(it)]?.[1]||TYPES[it.type][1])+'</small></span><span class="value">'+escapeHtml(summary(it))+' ›</span></button>').join('')+'</div>'}
 function legacyHome(){let n=db.items.filter(x=>rec(x.id,today())!=null).length;return head('A little life, every day.','Your personal space to notice the little things. 🌿')+'<div class="card hero"><div class="flower">🌼</div><div class="eyebrow">TODAY · '+new Date().toLocaleDateString('en-SG',{weekday:'long',month:'long',day:'numeric'})+'</div><p style="margin:17px 0 5px"><strong>Make today yours.</strong></p><div class="muted">'+n+' of '+db.items.length+' trackers recorded today</div></div><div class="section"><h2>Your trackers</h2><button class="pill" onclick="show(\'new\')">+ Add</button></div>'+tiles()+(db.items.length?'':'<div class="card empty-state">Create your first tracker 🌸</div>')}
 
 const TRACKER_V2_DEFAULTS=[
@@ -478,7 +540,7 @@ function appearancePanel(){let mode=localStorage.getItem('wbb-life-appearance')|
 function setAppearance(mode){localStorage.setItem('wbb-life-appearance',mode);applyAppearance();render()}
 function applyAppearance(){let mode=localStorage.getItem('wbb-life-appearance')||'system',dark=mode==='dark'||mode==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark-mode',dark)}
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyAppearance);
-function settings(){return '<div class="card"><h2>Make it yours 🎨</h2><p>Choose your colors. Saved automatically on this device.</p>'+palette('background','Background color')+palette('calendar','Calendar color')+palette('accent','Accent color')+palette('button','Button color')+'<h3 style="margin-top:25px">Selection cards</h3>'+palette('optionCard','Option card color')+palette('selectedOption','Selected option color')+'</div>'+categorySettings()+appearancePanel()+'<div class="card"><h2>Your data belongs to you</h2><p>Your records are stored locally in this browser. When signed in, records sync to your private cloud account. Export a backup regularly.</p><div class="settingsActions"><button class="primary" onclick="exportData()">Export backup</button><button class="secondary" onclick="document.getElementById(\'import\').click()">Import backup</button></div><input type="file" class="hide" id="import" accept=".json,application/json" onchange="importData(event)"></div><div class="card"><h2>Reset Trackers</h2><p>Delete all trackers, categories and their history. Notes and To-Do are kept. Export a backup first if you might need the records later.</p><button class="secondary" onclick="resetTrackersAndCategories()">Reset Trackers & Categories</button></div>'+cloudPanel()+'<div class="card"><h2>Bin</h2><p>Restore deleted Things notes and sections. Items are never cleared automatically.</p><button class="secondary" onclick="show(\'things-bin\')">Open Bin ('+thingsBinEntries().length+')</button></div>'}
+function settings(){return '<div class="card"><h2>Search</h2><p>Search across Do, Things, and Trackers.</p><button class="secondary" onclick="show(\'search\')">⌕ Search WBB Life</button></div><div class="card"><h2>Make it yours 🎨</h2><p>Choose your colors. Saved automatically on this device.</p>'+palette('background','Background color')+palette('calendar','Calendar color')+palette('accent','Accent color')+palette('button','Button color')+'<h3 style="margin-top:25px">Selection cards</h3>'+palette('optionCard','Option card color')+palette('selectedOption','Selected option color')+'</div>'+categorySettings()+appearancePanel()+'<div class="card"><h2>Your data belongs to you</h2><p>Your records are stored locally in this browser. When signed in, records sync to your private cloud account. Export a backup regularly.</p><div class="settingsActions"><button class="primary" onclick="exportData()">Export backup</button><button class="secondary" onclick="document.getElementById(\'import\').click()">Import backup</button></div><input type="file" class="hide" id="import" accept=".json,application/json" onchange="importData(event)"></div><div class="card"><h2>Reset Trackers</h2><p>Delete all trackers, categories and their history. Notes and To-Do are kept. Export a backup first if you might need the records later.</p><button class="secondary" onclick="resetTrackersAndCategories()">Reset Trackers & Categories</button></div>'+cloudPanel()+'<div class="card"><h2>Bin</h2><p>Restore deleted Things notes and sections. Items are never cleared automatically.</p><button class="secondary" onclick="show(\'things-bin\')">Open Bin ('+thingsBinEntries().length+')</button></div>'}
 async function resetTrackersAndCategories(){
  if(!confirm('Permanently delete ALL trackers, categories and their history on every synced device? Notes and To-Do will stay. This cannot be undone.'))return;
  if(!confirm('Final confirmation: erase all Tracker history?'))return;
@@ -552,7 +614,9 @@ let swipeX=0,swipeY=0;
 function swipeStart(e){swipeX=e.touches[0].clientX;swipeY=e.touches[0].clientY}
 function swipeEnd(e){let dx=e.changedTouches[0].clientX-swipeX,dy=e.changedTouches[0].clientY-swipeY;if(Math.abs(dx)<55||Math.abs(dx)<Math.abs(dy)*1.3)return;let row=e.currentTarget;if(dx<0){document.querySelectorAll('.swipe-row.revealed').forEach(x=>{if(x!==row)x.classList.remove('revealed')});row.classList.add('revealed')}else row.classList.remove('revealed')}
 function searchPage(){return '<div class="top-brand"><div><h1 class="brand-title">Search</h1><p class="brand-sub">Find anything in WBB Life</p></div><button onclick="show(\'home\')">×</button></div><div class="card"><input id="global-search" type="search" placeholder="Search notes, trackers, events…" autocomplete="off" oninput="searchUpdate(this.value)" style="width:100%;padding:13px;border-radius:12px;border:1px solid #ddd;font-size:18px"></div><div id="search-results" aria-live="polite"><p class="muted">Type something to search your records.</p></div>'}
-function searchUpdate(value){let q=value.trim().toLocaleLowerCase(),box=document.getElementById('search-results');if(!q){box.innerHTML='<p class="muted">Type something to search your records.</p>';return}let sections=[];let matches=db.items.filter(it=>it.name.toLocaleLowerCase().includes(q));if(matches.length)sections.push('<div class="card"><h2>Trackers & Event Logs</h2>'+matches.map(it=>'<button class="search-result" onclick="show(\'detail\',\''+it.id+'\')">'+escapeHtml(it.name)+' <small>'+escapeHtml(it.type==='event'?'Event Log':'Tracker')+'</small></button>').join('')+'</div>');let notes=[];for(let [d,rows] of Object.entries(db.notes||{})){if(!Array.isArray(rows))continue;for(let row of rows){if((row.text||'').toLocaleLowerCase().includes(q))notes.push({d,text:row.text})}}notes.sort((a,b)=>b.d.localeCompare(a.d));if(notes.length)sections.push('<div class="card"><h2>Daily Notes</h2>'+notes.slice(0,100).map(x=>'<button class="search-result" onclick="noteDate=\''+x.d+'\';show(\'notes\')">'+escapeHtml(x.text)+' <small>'+escapeHtml(x.d)+'</small></button>').join('')+'</div>');let events=[];for(let it of db.items.filter(x=>x.type==='event'))for(let e of eventList(it.id)){if((e.note||'').toLocaleLowerCase().includes(q)||e.date.includes(q))events.push({it,e})}events.sort((a,b)=>b.e.date.localeCompare(a.e.date));if(events.length)sections.push('<div class="card"><h2>Event History</h2>'+events.slice(0,100).map(x=>'<button class="search-result" onclick="show(\'detail\',\''+x.it.id+'\')">'+escapeHtml(x.it.name)+' · '+escapeHtml(x.e.note||x.e.date)+' <small>'+escapeHtml(x.e.date)+'</small></button>').join('')+'</div>');box.innerHTML=sections.join('')||'<p class="muted">No matches found.</p>'}
+function searchUpdate(value){let q=value.trim().toLocaleLowerCase(),box=document.getElementById('search-results');if(!q){box.innerHTML='<p class="muted">Type something to search your records.</p>';return}let sections=[];let matches=[...(db.items||[]),...(db.trackerCards||[])].filter(it=>(it.name||'').toLocaleLowerCase().includes(q));if(matches.length)sections.push('<div class="card"><h2>Trackers & Event Logs</h2>'+matches.map(it=>'<button class="search-result" onclick="show(\'detail\',\''+it.id+'\')">'+escapeHtml(it.name)+' <small>'+escapeHtml(it.type==='event'?'Event Log':'Tracker')+'</small></button>').join('')+'</div>');let notes=[];for(let [d,rows] of Object.entries(db.notes||{})){if(!Array.isArray(rows))continue;for(let row of rows){if((row.text||'').toLocaleLowerCase().includes(q))notes.push({d,text:row.text})}}notes.sort((a,b)=>b.d.localeCompare(a.d));if(notes.length)sections.push('<div class="card"><h2>Daily Notes</h2>'+notes.slice(0,100).map(x=>'<button class="search-result" onclick="noteDate=\''+x.d+'\';show(\'notes\')">'+escapeHtml(x.text)+' <small>'+escapeHtml(x.d)+'</small></button>').join('')+'</div>');let events=[];for(let it of db.items.filter(x=>x.type==='event'))for(let e of eventList(it.id)){if((e.note||'').toLocaleLowerCase().includes(q)||e.date.includes(q))events.push({it,e})}events.sort((a,b)=>b.e.date.localeCompare(a.e.date));if(events.length)sections.push('<div class="card"><h2>Event History</h2>'+events.slice(0,100).map(x=>'<button class="search-result" onclick="show(\'detail\',\''+x.it.id+'\')">'+escapeHtml(x.it.name)+' · '+escapeHtml(x.e.note||x.e.date)+' <small>'+escapeHtml(x.e.date)+'</small></button>').join('')+'</div>');let thingsHits=[];for(const c of db.thingsSections||[]){if(c.name.toLocaleLowerCase().includes(q))thingsHits.push({c});for(const d of c.docs||[])if((d.title||'').toLocaleLowerCase().includes(q)||thingsPreview(d).toLocaleLowerCase().includes(q))thingsHits.push({c,d})}
+if(thingsHits.length)sections.push('<div class="card"><h2>Things</h2>'+thingsHits.slice(0,100).map(x=>'<button class="search-result" onclick="thingsOpenSection(\''+x.c.id+'\');'+(x.d?'thingsOpenDoc(\''+x.d.id+'\')':'')+'">'+escapeHtml(x.d?.title||x.c.name)+' <small>'+escapeHtml(x.c.name)+'</small></button>').join('')+'</div>');
+box.innerHTML=sections.join('')||'<p class="muted">No matches found.</p>'}
 
 function render(){navigation();el.innerHTML=page==='home'?home():page==='notes'?dailyNotes():page==='things'?thingsHome():page==='things-bin'?thingsBinPage():page==='things-section'?thingsSectionPage():page==='things-doc'?thingsDocPage():page==='search'?searchPage():page==='categories'?categoryManage():page==='all'?all():page==='detail'?detail():page==='new'?editor(false):page==='edit'?editor(true):settings();nav.style.display=['new','edit','detail'].includes(page)?'none':'flex'}
 
@@ -586,7 +650,10 @@ function mergeLife(local,remote){
      for(const d of c.docs||[]){const prev=docs.get(d.id);if(!prev||Number(d.updatedAt||0)>Number(prev.updatedAt||0))docs.set(d.id,d)}
      byId.set(c.id,{...(Number(c.updatedAt||0)>Number(old.updatedAt||0)?c:old),docs:[...docs.values()]});
    }
-   out.thingsSections=[...byId.values()].map(c=>({...c,docs:(c.docs||[]).filter(d=>!out.deletedThingsDocs.includes(d.id))}));
+   const useLocalOrder=Number(local.thingsOrderUpdatedAt||0)>=Number(remote?.thingsOrderUpdatedAt||0);
+   const ordered=useLocalOrder?(local.thingsSections||[]):(remote?.thingsSections||[]);
+   out.thingsSections=[...ordered.filter(c=>byId.has(c.id)).map(c=>byId.get(c.id)),...[...byId.values()].filter(c=>!ordered.some(x=>x.id===c.id))].map(c=>({...c,docs:(c.docs||[]).filter(d=>!out.deletedThingsDocs.includes(d.id))}));
+   out.thingsOrderUpdatedAt=Math.max(Number(local.thingsOrderUpdatedAt||0),Number(remote?.thingsOrderUpdatedAt||0));
    const names=new Set();out.thingsSections=out.thingsSections.filter(c=>{const key=c.name.trim().toLowerCase();if(names.has(key)&&!(c.docs||[]).length){out.deletedThingsSections.push(c.id);return false}names.add(key);return true});
  }
  const goneItems=new Set(out.deletedItems),goneCats=new Set(out.deletedCategories);
