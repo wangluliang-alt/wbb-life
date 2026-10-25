@@ -415,7 +415,7 @@ function trackerV2Value(card,day){
 function trackerV2Label(card,day){
  const n=trackerV2Value(card,day);if(n===null)return '—';
  if(card.type==='sleep')return fmt(n);
- if(card.type==='minutes')return fmt(n);
+ if(card.type==='minutes')return Number((n/60).toFixed(3))+' hr';
  return String(n)+' '+(card.unit||'');
 }
 function trackerV2Chart(card){
@@ -503,7 +503,7 @@ function trackerV2Edit(id){
  const card=db.trackerCards.find(c=>c.id===id);if(!card)return;
  trackerV2Close();
  const value=db.trackerCardRecords?.[id]?.[homeDate],sleep=card.type==='sleep';
- const fields=sleep?'<div id="tv2-sleep-rows"></div><button type="button" class="tv2-add" onclick="trackerV2SleepRow()">+ Add another sleep</button><label>Daily summary (optional)<textarea id="tv2-summary" class="tv2-note" rows="3" placeholder="How did you sleep today?"></textarea></label>':'<label>Value ('+escapeHtml(card.unit||'')+')<input id="tv2-number" type="number" min="0" step="'+(card.type==='number'?'0.1':'1')+'" value="'+(value??'')+'" placeholder="Enter value"></label>';
+ const fields=sleep?'<div id="tv2-sleep-rows"></div><button type="button" class="tv2-add" onclick="trackerV2SleepRow()">+ Add another sleep</button><label>Daily summary (optional)<textarea id="tv2-summary" class="tv2-note" rows="3" placeholder="How did you sleep today?"></textarea></label>':'<label>Value ('+escapeHtml(card.type==='minutes'?'hr':card.unit||'')+')<input id="tv2-number" type="number" min="0" step="'+(card.type==='minutes'?'0.5':card.type==='number'?'0.1':'1')+'" value="'+(card.type==='minutes'&&value!=null?Number((Number(value)/60).toFixed(3)):value??'')+'" placeholder="Enter value"></label>';
  document.body.insertAdjacentHTML('beforeend','<div class="tracker-v2-overlay" id="tracker-v2-overlay"><div class="tracker-v2-dialog"><h2>'+escapeHtml(card.name)+'</h2><p>'+escapeHtml(homeDate)+'</p>'+fields+'<div class="tracker-v2-actions"><button onclick="trackerV2Close()">Cancel</button><button onclick="trackerV2Clear(\''+id+'\')">Clear</button><button class="primary" onclick="trackerV2Save(\''+id+'\')">Save</button></div></div></div>');
  if(sleep){const entries=Array.isArray(value)?value:(value?.start&&value?.end?[value]:[]);(entries.length?entries:[{}]).forEach(trackerV2SleepRow);document.getElementById('tv2-summary').value=db.trackerSleepSummaries?.[homeDate]||entries.find(x=>x.note)?.note||''}
 }
@@ -512,7 +512,7 @@ function trackerV2Save(id){
  const card=db.trackerCards.find(c=>c.id===id);if(!card)return;
  let v;
  if(card.type==='sleep'){v=trackerV2SleepRows();if(!v.length)return alert('Add at least one sleep entry.');if(v.some(x=>!x.start||!x.end||x.start===x.end))return alert('Each entry needs different sleep and wake times.');db.trackerSleepSummaries ||= {};db.trackerSleepSummaries[homeDate]=document.getElementById('tv2-summary').value.trim();}
- else {let raw=document.getElementById('tv2-number').value;if(raw.trim()==='')return alert('Enter a value or choose Clear.');v=Number(raw);if(!Number.isFinite(v)||v<0)return alert('Enter a valid number.')}
+ else {let raw=document.getElementById('tv2-number').value;if(raw.trim()==='')return alert('Enter a value or choose Clear.');v=Number(raw);if(!Number.isFinite(v)||v<0)return alert('Enter a valid number.');if(card.type==='minutes')v=Number((v*60).toFixed(4))}
  db.trackerCardRecords ||= {};db.trackerCardRecords[id] ||= {};db.trackerCardRecords[id][homeDate]=v;save();trackerV2Close();render();
 }
 function trackerV2Clear(id){if(!confirm('Clear this day’s record?'))return;if(db.trackerCardRecords?.[id])delete db.trackerCardRecords[id][homeDate];save();trackerV2Close();render()}
