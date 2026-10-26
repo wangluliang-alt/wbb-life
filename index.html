@@ -15,6 +15,10 @@
 .note-toolbar input{width:110px;accent-color:var(--app-accent,#ec5a92)}
 .note-editor{background:#ffffffbd;border-radius:19px;padding:14px 12px;min-height:270px}
 .note-line.note-blank .note-check,.note-line.note-blank .note-marker,.note-line.note-blank select,.note-line.note-blank .repeat-icon,.note-line.note-blank .repeat-status{visibility:hidden}
+/* Blank lines behave like a plain notepad; filled checklist items keep their controls. */
+.note-line.note-blank .note-check,.note-line.note-blank .note-marker,.note-line.note-blank select,.note-line.note-blank .repeat-icon,.note-line.note-blank .repeat-status{display:none}
+.note-line.note-blank .swipe-content{padding-left:0}
+.note-line.note-blank .note-text{padding-left:2px}
 .note-line{display:flex;align-items:flex-start;gap:8px;min-height:43px;margin:2px 0}
 .note-line .note-check{flex:none;width:25px;height:25px;border:2px solid #b0b4bc;border-radius:7px;background:#fff;margin-top:8px;color:white;font-weight:700;padding:0}
 .note-line .note-check.checked{background:var(--app-accent,#ec5a92);border-color:var(--app-accent,#ec5a92)}
