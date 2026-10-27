@@ -85,7 +85,7 @@
 .font-scale-setting{display:flex;align-items:center;gap:14px;margin:15px 0}.font-scale-setting input{flex:1;accent-color:var(--app-accent,#365f4f)}.font-scale-setting span{min-width:46px;text-align:right;font-weight:700}
 .week-controls>span{font-size:calc(28px * var(--font-scale,1))!important;line-height:1.2}
 .notes-overview-more{margin-top:10px;color:#889088;font-size:12px;text-align:left}
-</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script></head><body><div id="app" class="shell"></div><nav id="nav" class="bottom"></nav><script>
+.life-tabs{display:flex;gap:8px;background:#f2f2f2;border-radius:15px;padding:5px;margin:12px 0 18px}.life-tabs button{flex:1;border:0;border-radius:11px;padding:11px;background:transparent;font-weight:700}.life-tabs .selected{background:white;box-shadow:0 2px 8px #0001}.counter-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.counter-card{border-radius:20px;padding:14px;min-height:170px;display:flex;flex-direction:column}.counter-top{display:flex;justify-content:space-between;gap:6px}.counter-top strong{overflow-wrap:anywhere}.counter-top button{border:0;background:#ffffff80;border-radius:8px}.counter-number{font-size:42px;font-weight:800;text-align:center;margin:auto 0}.counter-actions{display:flex;gap:8px}.counter-actions button{flex:1;border:0;border-radius:12px;background:#ffffffc9;padding:10px;font-size:20px}.counter-add{border:2px dashed #ccd4d0;border-radius:20px;background:#ffffff8a;min-height:170px;font-size:17px}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script></head><body><div id="app" class="shell"></div><nav id="nav" class="bottom"></nav><script>
 const KEY='wbb-life-v1';
 const TYPES={event:['','Date + optional note','Record an event when it happens'],bool:['✅','Yes / No','A simple daily check-in'],number:['⚖️','Number','Measurements like weight'],counter:['🔢','Counter','Tap +1 whenever it happens'],duration:['⏱️','Duration','Minutes or hours per day'],interval:['🌙','Time range','Start and end; multiple per day'],journal:['📝','Journal','Daily written notes']};
 const starter=[['Weight','number','⚖️','kg'],['Reading','bool','📚',''],['Exercise','duration','🏃','min'],['Water','counter','💧','times'],['Sleep','interval','🌙','']];
@@ -474,9 +474,19 @@ function trackerV2TouchCancel(){
  document.querySelectorAll('.tracker-v2-moving,.tracker-v2-drop-target').forEach(x=>x.classList.remove('tracker-v2-moving','tracker-v2-drop-target'));
  if(trackerV2Pointer){trackerV2Pointer.grip.style.touchAction='';trackerV2Pointer=null}
 }
+
+let lifeTab='trackers';
+const COUNTER_COLORS=['#ffb4c9','#a6d5ff','#ffda8b','#b8e9c0','#d6b9fa','#ffbca5'];
+function counterInit(){db.counters ||= [];db.counterRecords ||= {};db.deletedCounters ||= []}
+function counterValue(id,day){return Math.max(0,Number(db.counterRecords?.[id]?.[day]?.count||0))}
+function counterTab(tab){lifeTab=tab;render()}
+function counterView(){counterInit();return '<div class="tracker-v2-head"><h2>Counters</h2><span>'+homeDate+'</span></div>'+homeWeek()+'<div class="counter-grid">'+db.counters.filter(c=>!db.deletedCounters.includes(c.id)).map(c=>'<div class="counter-card" style="background:'+escapeHtml(c.color)+'"><div class="counter-top"><strong>'+escapeHtml(c.name)+'</strong><button onclick="counterSettings(\''+c.id+'\')">⚙</button></div><div class="counter-number">'+counterValue(c.id,homeDate)+'</div><div class="counter-actions"><button onclick="counterChange(\''+c.id+'\',-1)">−</button><button onclick="counterChange(\''+c.id+'\',1)">+1</button></div></div>').join('')+'<button class="counter-add" onclick="counterAdd()">＋<div>Add Counter</div></button></div>'}
+function counterAdd(){counterInit();const name=prompt('Counter name');if(!name?.trim())return;db.counters.push({id:'count-'+uid(),name:name.trim().slice(0,45),color:COUNTER_COLORS[db.counters.length%COUNTER_COLORS.length],updatedAt:Date.now()});save();render()}
+function counterChange(id,delta){counterInit();if(!db.counters.some(c=>c.id===id)||db.deletedCounters.includes(id))return;db.counterRecords[id] ||= {};db.counterRecords[id][homeDate]={count:Math.max(0,counterValue(id,homeDate)+delta),updatedAt:Date.now()};save();render()}
+function counterSettings(id){const c=db.counters?.find(x=>x.id===id);if(!c)return;const a=prompt('Enter 1 to rename, 2 to change color, 3 to delete');if(a==='1'){const n=prompt('Counter name',c.name);if(n?.trim()){c.name=n.trim().slice(0,45);c.updatedAt=Date.now();save();render()}}else if(a==='2'){c.color=COUNTER_COLORS[(COUNTER_COLORS.indexOf(c.color)+1)%COUNTER_COLORS.length];c.updatedAt=Date.now();save();render()}else if(a==='3'&&confirm('Delete this counter? History will be retained.')){db.deletedCounters.push(id);save();render()}}
 function home(){
  trackerV2Init();
- return '<div class="tracker-v2-head"><h2>Trackers</h2><span>'+new Date(homeDate+'T12:00:00').toLocaleDateString('en-SG',{day:'numeric',month:'short',year:'numeric'})+'</span></div>'+homeWeek()+'<div class="tracker-v2-grid">'+db.trackerCards.map(trackerV2Card).join('')+'<button class="tracker-v2-add" onclick="trackerV2Add()">＋<span>Add Tracker</span></button></div>';
+ return '<div class="life-tabs"><button class="'+(lifeTab==='trackers'?'selected':'')+'" onclick="counterTab(\'trackers\')">Trackers</button><button class="'+(lifeTab==='counters'?'selected':'')+'" onclick="counterTab(\'counters\')">Counters</button></div>'+(lifeTab==='counters'?counterView():'<div class="tracker-v2-head"><h2>Trackers</h2><span>'+new Date(homeDate+'T12:00:00').toLocaleDateString('en-SG',{day:'numeric',month:'short',year:'numeric'})+'</span></div>'+homeWeek()+'<div class="tracker-v2-grid">'+db.trackerCards.map(trackerV2Card).join('')+'<button class="tracker-v2-add" onclick="trackerV2Add()">＋<span>Add Tracker</span></button></div>');
 }
 function trackerV2SleepRows(){
  return [...document.querySelectorAll('#tv2-sleep-rows .tv2-sleep-row')].map(row=>({start:row.querySelector('.tv2-start').value,end:row.querySelector('.tv2-end').value}));
@@ -724,6 +734,10 @@ const CLOUD_URL='https://dvfnbeuwnuvnynrgvugf.supabase.co', CLOUD_KEY='sb_publis
 function cloudClient(){if(!cloud&&window.supabase)cloud=window.supabase.createClient(CLOUD_URL,CLOUD_KEY);return cloud}
 function mergeLife(local,remote){
  let out=JSON.parse(JSON.stringify(remote||{}));
+ out.deletedCounters=[...new Set([...(remote?.deletedCounters||[]),...(local.deletedCounters||[])])];
+ const counterMap=new Map();for(const c of [...(remote?.counters||[]),...(local.counters||[])]){const p=counterMap.get(c.id);if(!p||Number(c.updatedAt||0)>=Number(p.updatedAt||0))counterMap.set(c.id,c)}
+ out.counters=[...counterMap.values()].filter(c=>!out.deletedCounters.includes(c.id));
+ out.counterRecords={};for(const source of [remote?.counterRecords||{},local.counterRecords||{}])for(const [id,days] of Object.entries(source))for(const [day,value] of Object.entries(days||{})){out.counterRecords[id] ||= {};const old=out.counterRecords[id][day];if(!old||Number(value?.updatedAt||0)>=Number(old?.updatedAt||0))out.counterRecords[id][day]=value}
  // The new tracker dashboard is separate from legacy tracker categories.
  const cardsById=new Map([...(remote?.trackerCards||[]),...(local.trackerCards||[])].map(c=>[c.id,c]));
  if(cardsById.size){const newer=Number(local.trackerCardsOrderUpdatedAt||0)>=Number(remote?.trackerCardsOrderUpdatedAt||0);const primary=newer?(local.trackerCards||[]):(remote?.trackerCards||[]);out.trackerCards=[...primary.map(c=>cardsById.get(c.id)),...[...cardsById.values()].filter(c=>!primary.some(p=>p.id===c.id))];out.trackerCardsOrderUpdatedAt=Math.max(Number(local.trackerCardsOrderUpdatedAt||0),Number(remote?.trackerCardsOrderUpdatedAt||0));}
