@@ -441,12 +441,13 @@ let historyId=null,historyMode='month',historyDate=null,historySelected=null;
 function historyOpen(id){historyId=id;historyMode='month';historyDate=homeDate;historySelected=homeDate;page='history';render();window.scrollTo(0,0)}
 function historyShift(n){let d=new Date(historyDate+'T12:00:00');if(historyMode==='month')d.setMonth(d.getMonth()+n);else d.setDate(d.getDate()+7*n);historyDate=iso(d);render()}
 function historyPick(d){historySelected=d;render()}
+function historyCompactValue(card,day){const v=trackerV2Value(card,day);if(v===null)return '';if(card.type==='minutes')return String(Number((v/60).toFixed(2)))+'h';if(card.type==='sleep')return String(Number((v/60).toFixed(1)))+'h';return String(Number(v.toFixed(2)))}
 function historyPage(){
  const c=db.trackerCards.find(x=>x.id===historyId);if(!c)return '';
  const anchor=new Date(historyDate+'T12:00:00'),start=historyMode==='month'?new Date(anchor.getFullYear(),anchor.getMonth(),1,12):startOfWeek(historyDate);
  const offset=historyMode==='month'?(start.getDay()+6)%7:0,days=historyMode==='month'?new Date(anchor.getFullYear(),anchor.getMonth()+1,0).getDate():7;
  const count=historyMode==='month'?Math.ceil((offset+days)/7)*7:7;
- const cells=Array.from({length:count},(_,i)=>{let d=new Date(start);d.setDate(d.getDate()+i-offset);let day=iso(d),v=trackerV2Value(c,day);return '<button class="history-day '+(day===historySelected?'picked':'')+'" style="--history-number-color:'+escapeHtml(c.calendarNumberColor||'#253149')+'" onclick="historyPick(\''+day+'\')"><span>'+d.getDate()+'</span><small>'+(v===null?'':escapeHtml(trackerV2Label(c,day)))+'</small></button>'}).join('');
+ const cells=Array.from({length:count},(_,i)=>{let d=new Date(start);d.setDate(d.getDate()+i-offset);let day=iso(d),v=trackerV2Value(c,day);return '<button class="history-day '+(day===historySelected?'picked':'')+'" style="--history-number-color:'+escapeHtml(c.calendarNumberColor||'#253149')+'" onclick="historyPick(\''+day+'\')"><span>'+d.getDate()+'</span><small>'+(v===null?'':escapeHtml(historyCompactValue(c,day)))+'</small></button>'}).join('');
  return '<div class="history-header"><button onclick="show(\'home\')">← Trackers</button><h2>'+escapeHtml(c.name)+'</h2></div><div class="history-modes"><button onclick="historyMode=\'week\';render()">Week</button><button onclick="historyMode=\'month\';render()">Month</button></div><div class="history-controls"><button onclick="historyShift(-1)">‹</button><strong>'+anchor.toLocaleDateString('en-SG',{month:'long',year:'numeric'})+'</strong><button onclick="historyShift(1)">›</button></div><div class="history-grid">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>'<span>'+x+'</span>').join('')+cells+'</div><div class="card"><strong>'+historySelected+'</strong><p>'+escapeHtml(trackerV2Label(c,historySelected))+'</p><button class="primary" onclick="homeDate=historySelected;trackerV2Edit(\''+c.id+'\')">Add / Edit record</button></div>';
 }
 
