@@ -492,11 +492,34 @@ function trackerV2TouchCancel(){
 
 let lifeTab='trackers';
 const COUNTER_COLORS=['#ffb4c9','#a6d5ff','#ffda8b','#b8e9c0','#d6b9fa','#ffbca5'];
+const COUNTER_SUGGESTIONS=[
+ ['遵守止损','#b8e9c0'],['没有止损','#ffb4c9'],
+ ['按计划交易','#a6d5ff'],['冲动交易','#ffbca5'],
+ ['及时变现（卖了拿钱）','#b8e9c0'],['该卖没卖','#ffb4c9'],
+ ['海阔天空，柳暗花明','#d6b9fa'],['纠结、耿耿于怀','#ffda8b'],
+ ['学习了','#a6d5ff'],['没有学习','#ffb4c9'],
+ ['说做就做','#b8e9c0'],['想太多没行动','#ffda8b'],
+ ['完成 Home Project','#a6d5ff'],['拖延 Home Project','#ffbca5'],
+ ['尝试新东西','#d6b9fa'],['只想不做','#ffb4c9']
+];
+function counterSeedSuggestions(){
+ counterInit();
+ if(db.counterSuggestionsSeeded)return;
+ const now=Date.now();
+ for(let i=0;i<COUNTER_SUGGESTIONS.length;i++){
+  const [name,color]=COUNTER_SUGGESTIONS[i];
+  if(db.counters.some(c=>c.name===name))continue;
+  const id='suggested-20261028-'+i;
+  if(db.deletedCounters.includes(id)||db.counters.some(c=>c.id===id))continue;
+  db.counters.push({id,name,color,textColor:'#253149',period:'today',cardSize:'normal',showChart:false,updatedAt:now});
+ }
+ db.counterSuggestionsSeeded=true;save();
+}
 function counterInit(){db.counters ||= [];db.counterRecords ||= {};db.deletedCounters ||= []}
 function counterValue(id,day){return Math.max(0,Number(db.counterRecords?.[id]?.[day]?.count||0))}
 function counterPeriodValue(c,day){const period=c.period||'today';if(period==='today')return counterValue(c.id,day);const d=new Date(day+'T12:00:00'),start=new Date(d);if(period==='month')start.setDate(1);else start.setDate(d.getDate()-(d.getDay()+6)%7);let total=0;for(let cur=new Date(start);cur<=d;cur.setDate(cur.getDate()+1))total+=counterValue(c.id,iso(cur));return total}
 function counterTab(tab){lifeTab=tab;render()}
-function counterView(){counterInit();return '<div class="tracker-v2-head"><h2>Counters</h2><span>'+homeDate+'</span></div>'+homeWeek()+'<div class="counter-grid">'+db.counters.filter(c=>!db.deletedCounters.includes(c.id)).map(c=>'<div class="counter-card '+(c.cardSize==='wide'?'counter-wide':'')+'" onclick="counterChange(\''+c.id+'\',1)" style="background:'+escapeHtml(c.color)+';color:'+escapeHtml(c.textColor||'#253149')+'"><div class="counter-top"><strong>'+escapeHtml(c.name)+'</strong><button class="counter-menu-dot" onclick="event.stopPropagation();counterSettings(\''+c.id+'\')">···</button></div><div class="counter-period">'+(c.period==='month'?'THIS MONTH':c.period==='week'?'THIS WEEK':'TODAY')+'</div><div class="counter-number">'+counterPeriodValue(c,homeDate)+'</div></div>').join('')+'<button class="counter-add" onclick="counterAdd()">Add Counter</button></div>'}
+function counterView(){counterSeedSuggestions();return '<div class="tracker-v2-head"><h2>Counters</h2><span>'+homeDate+'</span></div>'+homeWeek()+'<div class="counter-grid">'+db.counters.filter(c=>!db.deletedCounters.includes(c.id)).map(c=>'<div class="counter-card '+(c.cardSize==='wide'?'counter-wide':'')+'" onclick="counterChange(\''+c.id+'\',1)" style="background:'+escapeHtml(c.color)+';color:'+escapeHtml(c.textColor||'#253149')+'"><div class="counter-top"><strong>'+escapeHtml(c.name)+'</strong><button class="counter-menu-dot" onclick="event.stopPropagation();counterSettings(\''+c.id+'\')">···</button></div><div class="counter-period">'+(c.period==='month'?'THIS MONTH':c.period==='week'?'THIS WEEK':'TODAY')+'</div><div class="counter-number">'+counterPeriodValue(c,homeDate)+'</div></div>').join('')+'<button class="counter-add" onclick="counterAdd()">Add Counter</button></div>'}
 function counterChart(c){const days=Array.from({length:7},(_,i)=>{const d=new Date(homeDate+'T12:00:00');d.setDate(d.getDate()-6+i);return counterValue(c.id,iso(d))});const max=Math.max(1,...days);return '<svg class="counter-chart" viewBox="0 0 280 50" aria-label="Last seven days">'+days.map((v,i)=>'<rect x="'+(9+i*40)+'" y="'+(46-v/max*40)+'" width="23" height="'+(v?Math.max(3,v/max*40):0)+'" rx="4" fill="'+escapeHtml(c.chartColor||'#468e87')+'"/>').join('')+'</svg>'}
 let counterHistoryId=null,counterHistoryMonth=null,counterHistorySelected=null;
 function counterHistoryOpen(id){counterHistoryId=id;counterHistoryMonth=homeDate;counterHistorySelected=homeDate;page='counter-history';render();window.scrollTo(0,0)}
@@ -787,6 +810,7 @@ const CLOUD_URL='https://dvfnbeuwnuvnynrgvugf.supabase.co', CLOUD_KEY='sb_publis
 function cloudClient(){if(!cloud&&window.supabase)cloud=window.supabase.createClient(CLOUD_URL,CLOUD_KEY);return cloud}
 function mergeLife(local,remote){
  let out=JSON.parse(JSON.stringify(remote||{}));
+ out.counterSuggestionsSeeded=Boolean(local.counterSuggestionsSeeded||remote?.counterSuggestionsSeeded);
  out.lifeTabStyle=Number(local.lifeTabStyle?.updatedAt||0)>=Number(remote?.lifeTabStyle?.updatedAt||0)?(local.lifeTabStyle||remote?.lifeTabStyle):remote.lifeTabStyle;
  out.deletedCounters=[...new Set([...(remote?.deletedCounters||[]),...(local.deletedCounters||[])])];
  const counterMap=new Map();for(const c of [...(remote?.counters||[]),...(local.counters||[])]){const p=counterMap.get(c.id);if(!p||Number(c.updatedAt||0)>=Number(p.updatedAt||0))counterMap.set(c.id,c)}
