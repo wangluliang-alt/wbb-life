@@ -591,7 +591,7 @@ function lifeTabSettingsReset(){db.lifeTabStyle={...LIFE_TAB_DEFAULT,updatedAt:D
 
 function home(){
  trackerV2Init();
- return '<div class="life-tab-wrap" style="'+lifeTabStyle()+'"><div class="life-tabs"><button class="life-tab-trackers '+(lifeTab==='trackers'?'selected':'')+'" onclick="counterTab(\'trackers\')">Trackers</button><button class="life-tab-counters '+(lifeTab==='counters'?'selected':'')+'" onclick="counterTab(\'counters\')">Counters</button></div><button class="life-tab-menu" aria-label="Tab bar settings" onclick="lifeTabSettings()">···</button></div>'+(lifeTab==='counters'?counterView():'<div class="tracker-v2-head"><h2>Trackers</h2><span>'+new Date(homeDate+'T12:00:00').toLocaleDateString('en-SG',{day:'numeric',month:'short',year:'numeric'})+'</span></div>'+homeWeek()+'<div class="tracker-v2-grid">'+db.trackerCards.map(trackerV2Card).join('')+'<button class="tracker-v2-add" onclick="trackerV2Add()">＋<span>Add Tracker</span></button></div>');
+ return '<div class="life-tab-wrap" style="'+lifeTabStyle()+'"><div class="life-tabs"><button class="life-tab-trackers '+(lifeTab==='trackers'?'selected':'')+'" onclick="counterTab(\'trackers\')">Trackers</button><button class="life-tab-counters '+(lifeTab==='counters'?'selected':'')+'" onclick="counterTab(\'counters\')">Counters</button></div><button class="life-tab-menu" aria-label="Tab bar settings" onclick="lifeTabSettings()">···</button></div>'+(lifeTab==='counters'?counterView():'<div class="tracker-v2-head"><h2>Trackers</h2><span>'+new Date(homeDate+'T12:00:00').toLocaleDateString('en-SG',{day:'numeric',month:'short',year:'numeric'})+'</span></div>'+homeWeek()+'<div class="tracker-v2-grid">'+db.trackerCards.filter(c=>!(db.deletedTrackerCards||[]).includes(c.id)).map(trackerV2Card).join('')+'<button class="tracker-v2-add" onclick="trackerV2Add()">＋<span>Add Tracker</span></button></div>');
 }
 function trackerV2SleepRows(){
  return [...document.querySelectorAll('#tv2-sleep-rows .tv2-sleep-row')].map(row=>({start:row.querySelector('.tv2-start').value,end:row.querySelector('.tv2-end').value}));
@@ -608,7 +608,7 @@ function trackerV2Settings(id){
  document.getElementById('tracker-v2-settings')?.remove();
  const colors=['#ffdce9','#d2f2df','#d7edff','#fff0c8','#e9dcff','#ffe2d3','#d8f0f3','#f9dfed','#e5efcd','#f7e6ff'];
  const el=document.createElement('div');el.id='tracker-v2-settings';el.dataset.id=id;el.className='things-card-settings-overlay';
- el.innerHTML='<div class="things-card-settings-dialog"><div class="settings-header-row"><h2>Tracker Settings</h2><div class="tcs-actions"><button onclick="trackerV2SettingsClose()">Cancel</button><button class="primary" onclick="trackerV2SettingsSave()">Save</button></div></div><label>Name<input id="tvs-name" maxlength="45"></label><div class="tcs-label">Card color</div><div class="tcs-palette">'+colors.map(v=>'<button type="button" class="tcs-swatch" data-color="'+v+'" style="background:'+v+'" onclick="document.getElementById(\'tvs-color\').value=this.dataset.color"></button>').join('')+'</div><label>Custom color<input id="tvs-color" type="color"></label><label>Text color<input id="tvs-text-color" type="color"></label><label>Calendar number color<input id="tvs-number-color" type="color"></label><label>Chart color<input id="tvs-chart-color" type="color"></label><label>Card size<select id="tvs-size"><option value="normal">Normal · half row</option><option value="wide">Wide · full row</option></select></label><label>Trend chart<select id="tvs-chart"><option value="show">Show</option><option value="hide">Hide</option></select></label><div class="tvs-order"><p>Card order</p><button onclick="trackerV2SettingsMove(-1)">Move earlier ↑</button> <button onclick="trackerV2SettingsMove(1)">Move later ↓</button></div></div>';
+ el.innerHTML='<div class="things-card-settings-dialog"><div class="settings-header-row"><h2>Tracker Settings</h2><div class="tcs-actions"><button onclick="trackerV2SettingsClose()">Cancel</button><button class="primary" onclick="trackerV2SettingsSave()">Save</button></div></div><label>Name<input id="tvs-name" maxlength="45"></label><div class="tcs-label">Card color</div><div class="tcs-palette">'+colors.map(v=>'<button type="button" class="tcs-swatch" data-color="'+v+'" style="background:'+v+'" onclick="document.getElementById(\'tvs-color\').value=this.dataset.color"></button>').join('')+'</div><label>Custom color<input id="tvs-color" type="color"></label><label>Text color<input id="tvs-text-color" type="color"></label><label>Calendar number color<input id="tvs-number-color" type="color"></label><label>Chart color<input id="tvs-chart-color" type="color"></label><label>Card size<select id="tvs-size"><option value="normal">Normal · half row</option><option value="wide">Wide · full row</option></select></label><label>Trend chart<select id="tvs-chart"><option value="show">Show</option><option value="hide">Hide</option></select></label><div class="tvs-order"><button type="button" onclick="trackerV2SettingsDelete()">Delete Tracker</button></div></div>';
  document.body.appendChild(el);document.getElementById('tvs-name').value=c.name;document.getElementById('tvs-color').value=/^#[0-9a-f]{6}$/i.test(c.color||'')?c.color:'#ffdce9';document.getElementById('tvs-text-color').value=c.textColor||'#253149';document.getElementById('tvs-chart-color').value=c.chartColor||(c.type==='number'?'#ef6193':'#65a7a1');document.getElementById('tvs-number-color').value=/^#[0-9a-f]{6}$/i.test(c.calendarNumberColor||'')?c.calendarNumberColor:'#253149';document.getElementById('tvs-size').value=c.cardSize==='wide'?'wide':'normal';document.getElementById('tvs-chart').value=c.showChart===false?'hide':'show';
 }
 function trackerV2SettingsClose(){document.getElementById('tracker-v2-settings')?.remove()}
@@ -616,6 +616,16 @@ function trackerV2SettingsSave(){
  const id=document.getElementById('tracker-v2-settings')?.dataset.id,c=db.trackerCards.find(x=>x.id===id);if(!c)return;
  const name=document.getElementById('tvs-name').value.trim();if(!name)return alert('Enter a name');
  c.name=name;c.color=document.getElementById('tvs-color').value;c.calendarNumberColor=document.getElementById('tvs-number-color').value;c.textColor=document.getElementById('tvs-text-color').value;c.chartColor=document.getElementById('tvs-chart-color').value;c.cardSize=document.getElementById('tvs-size').value;c.showChart=document.getElementById('tvs-chart').value==='show';c.updatedAt=Date.now();save();trackerV2SettingsClose();render();
+}
+function trackerV2SettingsDelete(){
+ const id=document.getElementById('tracker-v2-settings')?.dataset.id;
+ const card=db.trackerCards?.find(x=>x.id===id);if(!card)return;
+ if(!confirm('Delete tracker "'+card.name+'"? Its history will be kept.'))return;
+ db.deletedTrackerCards ||= [];
+ if(!db.deletedTrackerCards.includes(id))db.deletedTrackerCards.push(id);
+ db.trackerCards=db.trackerCards.filter(x=>x.id!==id);
+ db.trackerCardsOrderUpdatedAt=Date.now();
+ save();trackerV2SettingsClose();render();
 }
 function trackerV2SettingsMove(step){
  const id=document.getElementById('tracker-v2-settings')?.dataset.id,i=db.trackerCards.findIndex(x=>x.id===id),j=i+step;if(i<0||j<0||j>=db.trackerCards.length)return;
@@ -840,6 +850,7 @@ function cloudClient(){if(!cloud&&window.supabase)cloud=window.supabase.createCl
 function mergeLife(local,remote){
  let out=JSON.parse(JSON.stringify(remote||{}));
  out.counterSuggestionsSeeded=Boolean(local.counterSuggestionsSeeded||remote?.counterSuggestionsSeeded);
+ out.deletedTrackerCards=[...new Set([...(remote?.deletedTrackerCards||[]),...(local.deletedTrackerCards||[])])];
  out.lifeTabStyle=Number(local.lifeTabStyle?.updatedAt||0)>=Number(remote?.lifeTabStyle?.updatedAt||0)?(local.lifeTabStyle||remote?.lifeTabStyle):remote.lifeTabStyle;
  out.deletedCounters=[...new Set([...(remote?.deletedCounters||[]),...(local.deletedCounters||[])])];
  const counterMap=new Map();for(const c of [...(remote?.counters||[]),...(local.counters||[])]){const p=counterMap.get(c.id);if(!p||Number(c.updatedAt||0)>=Number(p.updatedAt||0))counterMap.set(c.id,c)}
@@ -847,7 +858,7 @@ function mergeLife(local,remote){
  out.counterRecords={};for(const source of [remote?.counterRecords||{},local.counterRecords||{}])for(const [id,days] of Object.entries(source))for(const [day,value] of Object.entries(days||{})){out.counterRecords[id] ||= {};const old=out.counterRecords[id][day];if(!old||Number(value?.updatedAt||0)>=Number(old?.updatedAt||0))out.counterRecords[id][day]=value}
  // The new tracker dashboard is separate from legacy tracker categories.
  const cardsById=new Map([...(remote?.trackerCards||[]),...(local.trackerCards||[])].map(c=>[c.id,c]));
- if(cardsById.size){const newer=Number(local.trackerCardsOrderUpdatedAt||0)>=Number(remote?.trackerCardsOrderUpdatedAt||0);const primary=newer?(local.trackerCards||[]):(remote?.trackerCards||[]);out.trackerCards=[...primary.map(c=>cardsById.get(c.id)),...[...cardsById.values()].filter(c=>!primary.some(p=>p.id===c.id))];out.trackerCardsOrderUpdatedAt=Math.max(Number(local.trackerCardsOrderUpdatedAt||0),Number(remote?.trackerCardsOrderUpdatedAt||0));}
+ if(cardsById.size){const newer=Number(local.trackerCardsOrderUpdatedAt||0)>=Number(remote?.trackerCardsOrderUpdatedAt||0);const primary=newer?(local.trackerCards||[]):(remote?.trackerCards||[]);out.trackerCards=[...primary.map(c=>cardsById.get(c.id)),...[...cardsById.values()].filter(c=>!primary.some(p=>p.id===c.id))];out.trackerCards=out.trackerCards.filter(c=>!out.deletedTrackerCards.includes(c.id));out.trackerCardsOrderUpdatedAt=Math.max(Number(local.trackerCardsOrderUpdatedAt||0),Number(remote?.trackerCardsOrderUpdatedAt||0));}
  out.trackerSleepSummaries={...(remote?.trackerSleepSummaries||{}),...(local.trackerSleepSummaries||{})};
  out.periodStarts={...(remote?.periodStarts||{})};for(const [day,v] of Object.entries(local.periodStarts||{})){if(!out.periodStarts[day]||Number(v.updatedAt||0)>Number(out.periodStarts[day].updatedAt||0))out.periodStarts[day]=v}
  out.trackerCardRecords={...(remote?.trackerCardRecords||{})};
@@ -940,6 +951,8 @@ async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cl
  if(remote){
    incoming.deletedItems=[...new Set([...(remote.deletedItems||[]),...(incoming.deletedItems||[])])];
    incoming.deletedCategories=[...new Set([...(remote.deletedCategories||[]),...(incoming.deletedCategories||[])])];
+   incoming.deletedTrackerCards=[...new Set([...(remote.deletedTrackerCards||[]),...(incoming.deletedTrackerCards||[])])];
+   incoming.trackerCards=(incoming.trackerCards||[]).filter(c=>!incoming.deletedTrackerCards.includes(c.id));
    const deletedIds=new Set(incoming.deletedItems);
    incoming.items=(incoming.items||[]).filter(it=>!deletedIds.has(it.id));
    for(const id of deletedIds)delete incoming.records?.[id];
