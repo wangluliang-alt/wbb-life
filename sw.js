@@ -1,5 +1,5 @@
 // Change this version whenever a new WBB Life release is deployed.
-const CACHE='wbb-life-v103';
+const CACHE='wbb-life-v104';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
