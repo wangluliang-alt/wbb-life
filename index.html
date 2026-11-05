@@ -908,7 +908,7 @@ function mergeLife(local,remote){
  for(let [k,v] of Object.entries(local))if(!['items','categories','records','notes','deletedItems','deletedCategories','deletedNotes','skippedRecurring','recurringNotes'].includes(k)&&!(k in out))out[k]=v;
  return out
 }
-async function cloudInit(){let c=cloudClient();if(!c){cloudStatus='Cloud library unavailable';return}let {data}=await c.auth.getUser();cloudUser=data?.user||null;if(cloudUser)await cloudSync();c.auth.onAuthStateChange((ev,session)=>{let id=session?.user?.id;if(id!==cloudUser?.id){cloudUser=session?.user||null;if(cloudUser)setTimeout(cloudSync,0);if(page==='settings')render()}});window.addEventListener('online',cloudSync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)cloudSync()});setInterval(()=>{if(!document.hidden)cloudSync()},60000)}
+async function cloudInit(){let c=cloudClient();if(!c){cloudStatus='Cloud library unavailable';return}let {data}=await c.auth.getUser();cloudUser=data?.user||null;if(cloudUser)await cloudSync();c.auth.onAuthStateChange((ev,session)=>{let id=session?.user?.id;if(id!==cloudUser?.id){cloudUser=session?.user||null;if(cloudUser)setTimeout(cloudSync,0);if(page==='settings')render()}});window.addEventListener('online',cloudSync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)cloudSync()});window.addEventListener('focus',cloudSync);window.addEventListener('pageshow',cloudSync);setInterval(()=>{if(!document.hidden)cloudSync()},30000)}
 async function cloudLogin(){let email=document.getElementById('cloud-email').value.trim(),password=document.getElementById('cloud-password').value;if(!email||!password)return alert('Enter email and password');let c=cloudClient();if(!c)return alert('Cloud library unavailable');let {data,error}=await c.auth.signInWithPassword({email,password});if(error)return alert(error.message);cloudUser=data.user;await cloudSync();render()}
 async function cloudLogout(){if(!confirm('Sign out on this device? Local data remains.'))return;await cloudClient().auth.signOut();cloudUser=null;cloudStatus='Not signed in';render()}
 function cloudChanged(){if(!cloudUser)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudSync,1200)}
@@ -916,7 +916,7 @@ function safeCloudRender(){
  // Rebuilding the Do page while a textarea has focus destroys the input,
  // moves the caret, and makes iOS jump to the top during typing.
  const active=document.activeElement;
- if(page==='notes')return; // Never redraw the Do page during background sync; preserve scroll and cursor.
+ if(page==='notes'&&active?.matches?.('input,textarea,[contenteditable="true"]'))return; // Preserve an active editor; refresh Do when it is safe.
  if(page!=='new'&&page!=='edit'&&page!=='things-doc')render();
 }
 async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cloudBusy=true;cloudStatus='Syncing…';try{let c=cloudClient(),res=await c.from('life_snapshots').select('payload').eq('user_id',cloudUser.id).maybeSingle();if(res.error)throw res.error;let version=cloudDirty,remote=res.data?.payload||null;
