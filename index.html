@@ -908,11 +908,21 @@ function mergeLife(local,remote){
  for(let [k,v] of Object.entries(local))if(!['items','categories','records','notes','deletedItems','deletedCategories','deletedNotes','skippedRecurring','recurringNotes'].includes(k)&&!(k in out))out[k]=v;
  return out
 }
-async function cloudInit(){let c=cloudClient();if(!c){cloudStatus='Cloud library unavailable';return}let {data}=await c.auth.getUser();cloudUser=data?.user||null;if(cloudUser)await cloudSync();c.auth.onAuthStateChange((ev,session)=>{let id=session?.user?.id;if(id!==cloudUser?.id){cloudUser=session?.user||null;if(cloudUser)setTimeout(cloudSync,0);if(page==='settings')render()}});window.addEventListener('online',cloudSync);const syncOnReturn=()=>{if(document.hidden)return;const active=document.activeElement;if(page==='notes'&&active?.matches?.('.note-text'))active.blur();cloudSync()};document.addEventListener('visibilitychange',syncOnReturn);window.addEventListener('focus',syncOnReturn);window.addEventListener('pageshow',syncOnReturn);setInterval(()=>{if(!document.hidden)cloudSync()},30000)}
+async function cloudInit(){let c=cloudClient();if(!c){cloudStatus='Cloud library unavailable';return}let {data}=await c.auth.getUser();cloudUser=data?.user||null;if(cloudUser)await cloudSync();c.auth.onAuthStateChange((ev,session)=>{let id=session?.user?.id;if(id!==cloudUser?.id){cloudUser=session?.user||null;if(cloudUser)setTimeout(cloudSync,0);if(page==='settings')render()}});window.addEventListener('online',cloudSync);const syncOnReturn=()=>{if(document.hidden)return;const active=document.activeElement;if(page==='notes'&&active?.matches?.('.note-text'))active.blur();cloudSync()};document.addEventListener('visibilitychange',syncOnReturn);window.addEventListener('focus',syncOnReturn);window.addEventListener('pageshow',syncOnReturn);setInterval(()=>{if(!document.hidden)cloudSync()},30000);setInterval(refreshVisibleDoNotes,3000)}
 async function cloudLogin(){let email=document.getElementById('cloud-email').value.trim(),password=document.getElementById('cloud-password').value;if(!email||!password)return alert('Enter email and password');let c=cloudClient();if(!c)return alert('Cloud library unavailable');let {data,error}=await c.auth.signInWithPassword({email,password});if(error)return alert(error.message);cloudUser=data.user;await cloudSync();render()}
 async function cloudLogout(){if(!confirm('Sign out on this device? Local data remains.'))return;await cloudClient().auth.signOut();cloudUser=null;cloudStatus='Not signed in';render()}
 function cloudChanged(){if(!cloudUser)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudSync,1200)}
 let noteLastInputAt=0;
+function refreshVisibleDoNotes(){
+ if(page!=='notes'||notesMode!=='daily'||document.hidden)return;
+ const editor=document.querySelector('.note-editor');if(!editor)return;
+ const rows=noteRows();
+ const visible=[...editor.querySelectorAll('textarea.note-text')];
+ const changed=visible.length!==rows.length||rows.some((row,i)=>visible[i]?.id!=='note-'+row.id||visible[i]?.value!==(row.text||'')||visible[i]?.classList.contains('done')!==Boolean(row.done));
+ if(!changed)return;
+ if(document.activeElement?.matches?.('.note-text')&&Date.now()-noteLastInputAt<15000)return;
+ render();
+}
 function safeCloudRender(){
  // An iOS PWA can retain a focused textarea even when nobody is editing.
  // Only defer redraw for recent typing; otherwise refresh the visible Do list.
