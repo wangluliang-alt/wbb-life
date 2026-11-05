@@ -773,7 +773,7 @@ function noteWeek(){let start=startOfWeek(noteDate),label=new Date(noteDate+'T12
 function notePick(key){noteDate=key;noteLastFocusedId=null;noteLastFocusedDate=null;render();noteRestoreCursor()}
 function noteShift(n){let d=new Date(noteDate+'T12:00:00');d.setDate(d.getDate()+7*n);noteDate=iso(d);noteLastFocusedId=null;noteLastFocusedDate=null;render();noteRestoreCursor()}
 function noteAdd(after){let rows=noteRows();if(after==null&&noteLastFocusedDate===noteDate&&noteLastFocusedId){const index=rows.findIndex(x=>x.id===noteLastFocusedId);if(index>=0)after=index}if(after==null){const blank=rows.find(x=>!(x.text||'').trim()&&!x.recurringId);if(blank){noteLastFocusedId=blank.id;noteLastFocusedDate=noteDate;render();document.getElementById('note-'+blank.id)?.focus();return}}let row={id:uid(),type:'check',text:'',done:false,updatedAt:Date.now()};rows.splice(after==null?rows.length:after+1,0,row);db.notes[noteDate]=rows;noteLastFocusedId=row.id;noteLastFocusedDate=noteDate;notePersist();render();const next=document.getElementById('note-'+row.id);if(next){next.focus();next.setSelectionRange(next.value.length,next.value.length)}}
-function noteText(id,value){let row=noteRowMutable(id);if(row){row.text=value;row.updatedAt=Date.now();document.getElementById('note-'+id)?.closest('.note-line')?.classList.toggle('note-blank',!value.trim());notePersist()}}
+function noteText(id,value){noteLastInputAt=Date.now();let row=noteRowMutable(id);if(row){row.text=value;row.updatedAt=Date.now();document.getElementById('note-'+id)?.closest('.note-line')?.classList.toggle('note-blank',!value.trim());notePersist()}}
 function noteDone(id){let row=noteRowMutable(id);if(row){row.done=!row.done;row.updatedAt=Date.now();notePersist();let line=document.getElementById('note-'+id);if(line)line.classList.toggle('done',row.done);let check=document.getElementById('check-'+id);if(check){check.classList.toggle('checked',row.done);check.textContent=row.done?'✓':''}}}
 function noteType(id,value){let row=noteRowMutable(id);if(row){row.type=value;if(value!=='check')row.done=false;row.updatedAt=Date.now();notePersist();let focus=id;render();document.getElementById('note-'+focus)?.focus()}}
 function noteKey(e,id){if(e.key==='Enter'){e.preventDefault();let index=noteRows().findIndex(x=>x.id===id);noteAdd(index)}else if(e.key==='Backspace'&&!e.target.value){let rows=noteRows(),index=rows.findIndex(x=>x.id===id);if(rows.length>1&&index>=0){e.preventDefault();let prev=rows[index-1]?.id||rows[index+1]?.id;db.deletedNotes ||= [];if(!db.deletedNotes.includes(id))db.deletedNotes.push(id);if(rows[index].recurringId){db.skippedRecurring ||= [];db.skippedRecurring.push('repeat-'+rows[index].recurringId+'-'+noteDate)}db.notes[noteDate]=rows.filter(x=>x.id!==id);notePersist();render();if(prev){const prior=document.getElementById('note-'+prev);if(prior){prior.focus();prior.setSelectionRange(prior.value.length,prior.value.length)}}}}}
@@ -912,11 +912,15 @@ async function cloudInit(){let c=cloudClient();if(!c){cloudStatus='Cloud library
 async function cloudLogin(){let email=document.getElementById('cloud-email').value.trim(),password=document.getElementById('cloud-password').value;if(!email||!password)return alert('Enter email and password');let c=cloudClient();if(!c)return alert('Cloud library unavailable');let {data,error}=await c.auth.signInWithPassword({email,password});if(error)return alert(error.message);cloudUser=data.user;await cloudSync();render()}
 async function cloudLogout(){if(!confirm('Sign out on this device? Local data remains.'))return;await cloudClient().auth.signOut();cloudUser=null;cloudStatus='Not signed in';render()}
 function cloudChanged(){if(!cloudUser)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudSync,1200)}
+let noteLastInputAt=0;
 function safeCloudRender(){
- // Rebuilding the Do page while a textarea has focus destroys the input,
- // moves the caret, and makes iOS jump to the top during typing.
+ // An iOS PWA can retain a focused textarea even when nobody is editing.
+ // Only defer redraw for recent typing; otherwise refresh the visible Do list.
  const active=document.activeElement;
- if(page==='notes'&&active?.matches?.('input,textarea,[contenteditable="true"]')){active.addEventListener('blur',()=>{if(page==='notes'&&!document.hidden)render()},{once:true});return;} // Keep the active editor intact and redraw after it loses focus.
+ if(page==='notes'&&active?.matches?.('.note-text')&&Date.now()-noteLastInputAt<15000){
+   active.addEventListener('blur',()=>{if(page==='notes'&&!document.hidden)render()},{once:true});
+   return;
+ }
  if(page!=='new'&&page!=='edit'&&page!=='things-doc')render();
 }
 async function cloudSync(){if(!cloudUser||cloudBusy||!navigator.onLine)return;cloudBusy=true;cloudStatus='Syncing…';try{let c=cloudClient(),res=await c.from('life_snapshots').select('payload').eq('user_id',cloudUser.id).maybeSingle();if(res.error)throw res.error;let version=cloudDirty,remote=res.data?.payload||null;
